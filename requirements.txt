@@ -1,0 +1,6 @@
+anthropic
+pandas
+scikit-learn
+scipy
+xgboost
+numpy
