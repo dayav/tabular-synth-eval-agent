@@ -19,3 +19,4 @@
 - Non-tabular data
 - Web UI / API endpoint
 - Framework-based orchestration (LangGraph, etc.) — kept for v2
+- Automatic exclusion of target column from fidelity metrics (caller must handle)
