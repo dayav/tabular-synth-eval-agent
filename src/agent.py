@@ -1,9 +1,13 @@
-"""Three tool wrappers around thesis evaluation functions."""
+"""Agent orchestration: dispatches user prompts to Claude with tool use."""
 import os
 from dotenv import load_dotenv
 from anthropic import Anthropic
 import json
+from report import save_report
 from tools import js_divergence_categorical, cohen_d_numerical, tstr_xgboost
+
+load_dotenv()
+client = Anthropic() 
 
 SYSTEM_PROMPT = """You are an expert in evaluating synthetic tabular data.
 
@@ -167,8 +171,6 @@ def run_agent(user_prompt: str, max_turns: int = 10) -> str:
     return "(max turns reached)"
 
 if __name__ == "__main__":
-    load_dotenv()
-    client = Anthropic() 
 
     user_prompt = (
         "Evaluate the synthetic dataset at examples/synth_sample.csv "
@@ -177,3 +179,6 @@ if __name__ == "__main__":
     )
     final_response = run_agent(user_prompt)
     print(final_response)
+
+    path = save_report(final_response)
+    print(f"\nReport saved to: {path}")
