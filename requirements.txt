@@ -4,5 +4,4 @@ scikit-learn
 scipy
 xgboost
 numpy
-scipy
-dotenv
+python-dotenv

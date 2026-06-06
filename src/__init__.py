@@ -1,1 +1,1 @@
-"""Three tool wrappers around thesis evaluation functions."""
+"""tabular-synth-eval-agent package."""
