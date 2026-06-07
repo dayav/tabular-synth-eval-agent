@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tabular-synth-eval-agent"
+version = "0.1.0"
+description = "An agent that evaluates synthetic tabular data for fidelity and utility."
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic",
+    "pandas",
+    "scikit-learn",
+    "scipy",
+    "xgboost",
+    "numpy",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy",
+    "pandas-stubs",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+# The modules import each other by top-level name (e.g. `from tools import ...`),
+# so `src` is the import root rather than a package prefix.
+mypy_path = "src"
+explicit_package_bases = true
+
+# scipy and sklearn do not ship inline types (no py.typed) and have no bundled
+# stubs here; treat their imports as untyped rather than failing the run.
+[[tool.mypy.overrides]]
+module = ["scipy.*", "sklearn.*"]
+ignore_missing_imports = true

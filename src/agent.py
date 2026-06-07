@@ -1,15 +1,25 @@
 """Agent orchestration: dispatches user prompts to Claude with tool use."""
-import os
+import json
+from collections.abc import Callable, Mapping
+from typing import Any
+
 from dotenv import load_dotenv
 from anthropic import Anthropic
-import json
+from anthropic.types import MessageParam, ToolParam, ToolResultBlockParam
+
 from report import save_report
-from tools import js_divergence_categorical, cohen_d_numerical, tstr_xgboost
+from tools import (
+    FidelityResult,
+    UtilityResult,
+    cohen_d_numerical,
+    js_divergence_categorical,
+    tstr_xgboost,
+)
 
 load_dotenv()
-client = Anthropic() 
+client: Anthropic = Anthropic()
 
-SYSTEM_PROMPT = """You are an expert in evaluating synthetic tabular data.
+SYSTEM_PROMPT: str = """You are an expert in evaluating synthetic tabular data.
 
 You have three tools available:
 - js_divergence_categorical: fidelity of categorical columns
@@ -26,7 +36,7 @@ Be honest. If the data is poor on any axis, say so.
 Note that the target column should not be interpreted as a fidelity issue
 when it appears in Cohen's d output — it's a label, not a feature."""
 
-TOOLS = [
+TOOLS: list[ToolParam] = [
     {
         "name": "js_divergence_categorical",
         "description": (
@@ -113,16 +123,13 @@ TOOLS = [
     },    
 ]
 
-# in src/agent.py
-
-
-TOOL_REGISTRY = {
+TOOL_REGISTRY: dict[str, Callable[..., FidelityResult | UtilityResult]] = {
     "js_divergence_categorical": js_divergence_categorical,
     "cohen_d_numerical": cohen_d_numerical,
     "tstr_xgboost": tstr_xgboost,
 }
 
-def run_tool(tool_name: str, tool_input: dict) -> dict:
+def run_tool(tool_name: str, tool_input: dict[str, Any]) -> Mapping[str, Any]:
     """Dispatch a tool call by name. Returns the tool's result dict."""
     if tool_name not in TOOL_REGISTRY:
         return {"error": f"Unknown tool: {tool_name}"}
@@ -134,7 +141,7 @@ def run_tool(tool_name: str, tool_input: dict) -> dict:
 
 def run_agent(user_prompt: str, max_turns: int = 10) -> str:
     """Run the agent loop until Claude stops calling tools."""
-    messages = [{"role": "user", "content": user_prompt}]
+    messages: list[MessageParam] = [{"role": "user", "content": user_prompt}]
 
     for turn in range(max_turns):
         response = client.messages.create(
@@ -157,7 +164,7 @@ def run_agent(user_prompt: str, max_turns: int = 10) -> str:
             return "(no text response)"
 
         # Otherwise, run each tool and append the results
-        tool_results = []
+        tool_results: list[ToolResultBlockParam] = []
         for block in response.content:
             if block.type == "tool_use":
                 result = run_tool(block.name, block.input)

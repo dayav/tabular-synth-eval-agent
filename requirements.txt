@@ -1,7 +1,7 @@
-anthropic
-pandas
-scikit-learn
-scipy
-xgboost
-numpy
-python-dotenv
+# Dependencies are declared in pyproject.toml ([project.dependencies]).
+# This file is a thin pointer so `pip install -r requirements.txt` still works
+# and reads from that single source of truth.
+#
+# For development tools (mypy, pandas-stubs), install the dev extra instead:
+#     pip install -e ".[dev]"
+-e .

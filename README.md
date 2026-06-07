@@ -25,11 +25,13 @@ You give the agent the path to a real dataset and the path to a synthetic versio
 pip install -r requirements.txt
 ```
 
-The agent calls the Anthropic API, so it needs an API key. Create a `.env` file in the project root:
+The agent calls the Anthropic API, so it needs an API key. Copy the example file and fill in your key:
 
 ```bash
-echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
+cp .env.example .env
 ```
+
+Then edit `.env` and set `ANTHROPIC_API_KEY` to your [Anthropic API key](https://console.anthropic.com/).
 
 ## Usage
 
@@ -62,7 +64,22 @@ path = save_report(assessment)
 print(f"Report saved to: {path}")
 ```
 
-A sample of the generated output is in [report.md](report.md).
+## Example output
+
+Run on the bundled sample data, the agent produces something like this:
+
+> ### Categorical Fidelity (Jensen-Shannon Distance)
+>
+> | Column | JS Distance | Rating |
+> |---|---|---|
+> | `gender` | 0.174 | ⚠️ Moderate |
+> | `education` | 0.000 | ✅ Perfect |
+> | `city` | 0.044 | ✅ Good |
+> | **Mean** | **0.073** | ✅ Acceptable |
+>
+> The overall mean JS distance of 0.073 is just under the 0.1 threshold... `gender` stands out with a score of 0.174 and warrants attention. `education` is perfectly replicated.
+>
+> *[...continues with numerical fidelity and utility evaluation. Full report at [report.md](report.md).]*
 
 ## Project structure
 
@@ -77,10 +94,13 @@ notes/         # Project scope and design notes
 
 ## Roadmap
 
-Planned for future versions (intentionally out of scope for v1):
+
+Likely v2: 
+- Add a privacy evaluation tool (HEOM-based identifiability epsilon, from the thesis pipeline). 
+
+Out of scope for v1 (planned for later):
 
 - Multivariate fidelity (correlation matrices, joint distributions)
-- Privacy evaluation
 - Framework-based orchestration (e.g. LangGraph)
 - A web UI / API endpoint
 

@@ -1,5 +1,7 @@
 """Three tool wrappers around thesis evaluation functions."""
 
+from typing import TypedDict
+
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import jensenshannon
@@ -10,8 +12,31 @@ from sklearn.metrics import accuracy_score
 from xgboost import XGBClassifier
 
 
+class FidelityResult(TypedDict):
+    """Per-column fidelity scores plus a summary, as returned by the fidelity tools.
 
-def js_divergence_categorical(real_csv_path: str, synth_csv_path: str) -> dict:
+    ``per_column`` maps each column name to its score, or ``None`` when the score
+    is undefined (e.g. a zero pooled standard deviation, or a NaN distance).
+    ``mean`` is the average over the defined scores, or ``None`` when none are defined.
+    """
+
+    per_column: dict[str, float | None]
+    mean: float | None
+    n_columns: int
+
+
+class UtilityResult(TypedDict):
+    """Train-on-synthetic vs train-on-real utility benchmark, returned by ``tstr_xgboost``."""
+
+    tstr_accuracy: float
+    trtr_accuracy: float
+    utility_gap: float
+    target_column: str
+    n_test_samples: int
+    n_classes: int
+
+
+def js_divergence_categorical(real_csv_path: str, synth_csv_path: str) -> FidelityResult:
     """
     Compute Jensen-Shannon distance for each categorical column.
     
@@ -32,7 +57,7 @@ def js_divergence_categorical(real_csv_path: str, synth_csv_path: str) -> dict:
 
     categorical_features = real_data.select_dtypes(include=['object', 'category', 'string']).columns
 
-    per_column = {}
+    per_column: dict[str, float | None] = {}
 
     for feature in categorical_features :
         categories = real_data[feature].unique()
@@ -59,7 +84,7 @@ def js_divergence_categorical(real_csv_path: str, synth_csv_path: str) -> dict:
 
     return _build_results(per_column)
 
-def cohen_d_numerical(real_csv_path: str, synth_csv_path: str) -> dict:
+def cohen_d_numerical(real_csv_path: str, synth_csv_path: str) -> FidelityResult:
     """
     Compute absolute Cohen's d effect size for each numerical column.
 
@@ -80,11 +105,11 @@ def cohen_d_numerical(real_csv_path: str, synth_csv_path: str) -> dict:
 
     numerical_features = real_data.select_dtypes(exclude=['object', 'category', 'string']).columns
 
-    per_column = {}
+    per_column: dict[str, float | None] = {}
 
     for feature in numerical_features :
-        group1 = real_data[feature].values
-        group2 = synthetic_data[feature].values
+        group1 = real_data[feature].to_numpy()
+        group2 = synthetic_data[feature].to_numpy()
 
         #calculate mean and variances
         means1 = np.mean(group1)
@@ -107,8 +132,8 @@ def tstr_xgboost(
     real_csv_path: str,
     synth_csv_path: str,
     target_column: str,
-    test_csv_path: str = None,
-) -> dict:
+    test_csv_path: str | None = None,
+) -> UtilityResult:
     """
     Train-on-synthetic, test-on-real (TSTR) utility benchmark using XGBoost.
     Compares against train-on-real, test-on-real (TRTR) baseline.
@@ -191,10 +216,10 @@ def tstr_xgboost(
         "n_classes": int(real_train[target_column].nunique()),
         }
 
-def _build_results(per_column: dict) -> dict:
+def _build_results(per_column: dict[str, float | None]) -> FidelityResult:
 
-    valid_values = [value for value in per_column.values() if value is not None]
-    mean = float(np.mean(valid_values)) if valid_values else None
+    valid_values: list[float] = [value for value in per_column.values() if value is not None]
+    mean: float | None = float(np.mean(valid_values)) if valid_values else None
 
     return {
         "per_column": per_column,
