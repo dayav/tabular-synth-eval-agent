@@ -1,0 +1,21 @@
+{
+  "description": "The clean synthetic draw with age multiplied by 10.",
+  "construction": "synth = clean; synth.age = synth.age * 10",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost"
+  ],
+  "verdict": {
+    "categorical": "good",
+    "numerical": "poor",
+    "utility": "good",
+    "overall": "acceptable"
+  },
+  "flagged_columns": [
+    "age"
+  ],
+  "notes": "Cohen's d on age is huge. Trees split on absolute thresholds and age carries no signal about the label, so utility barely moves: fidelity poor, utility good, overall acceptable."
+}

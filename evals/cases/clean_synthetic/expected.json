@@ -1,0 +1,19 @@
+{
+  "description": "A fresh draw from the same process as the real file: the control.",
+  "construction": "synth = draw_population(rng)  # same process, different random draw",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost"
+  ],
+  "verdict": {
+    "categorical": "good",
+    "numerical": "good",
+    "utility": "good",
+    "overall": "excellent"
+  },
+  "flagged_columns": [],
+  "notes": "What 'no corruption' scores look like. Every JS distance and Cohen's d is sampling noise, the utility gap is within a few hundredths of zero."
+}

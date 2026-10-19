@@ -1,11 +1,22 @@
-"""Agent orchestration: dispatches user prompts to Claude with tool use."""
+"""Agent orchestration: dispatches user prompts to Claude with tool use.
+
+``run_agent`` returns an :class:`AgentRun` carrying the final report, the ordered
+tool trace, token usage, the stop reason and the model that actually served the
+request, so that the evaluation harness in ``evals/`` can grade a run without
+re-parsing the conversation.
+"""
+
+from __future__ import annotations
+
 import json
+import os
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
-from dotenv import load_dotenv
 from anthropic import Anthropic
 from anthropic.types import MessageParam, ToolParam, ToolResultBlockParam
+from dotenv import load_dotenv
 
 from report import save_report
 from tools import (
@@ -17,33 +28,90 @@ from tools import (
 )
 
 load_dotenv()
-client: Anthropic = Anthropic()
 
-SYSTEM_PROMPT: str = """You are an expert in evaluating synthetic tabular data.
+DEFAULT_MODEL: str = "claude-sonnet-4-6"
+DEFAULT_MAX_TOKENS: int = 16000
+
+JS_THRESHOLD: float = 0.1
+COHEN_D_THRESHOLD: float = 0.2
+UTILITY_GAP_THRESHOLD: float = 0.05
+
+_client: Anthropic | None = None
+
+
+def get_client() -> Anthropic:
+    """Return the shared API client, creating it on first use.
+
+    Creating the client lazily means importing this module needs no API key,
+    which keeps the offline regression suite and the checkers importable.
+    """
+    global _client
+    if _client is None:
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY is not set. Put it in the environment or in a .env file."
+            )
+        _client = Anthropic()
+    return _client
+
+
+SYSTEM_PROMPT: str = f"""You are an expert in evaluating synthetic tabular data.
 
 You have three tools available:
-- js_divergence_categorical: fidelity of categorical columns
-- cohen_d_numerical: fidelity of numerical columns
+- js_divergence_categorical: fidelity of categorical columns (Jensen-Shannon distance)
+- cohen_d_numerical: fidelity of numerical columns (Cohen's d)
 - tstr_xgboost: predictive utility (train-on-synthetic vs train-on-real)
 
-When asked to evaluate a synthetic dataset, call all three tools in sequence,
-then write a short plain-English assessment summarizing:
-1. Categorical fidelity (JS distance — smaller is better, typically < 0.1 is good).
-2. Numerical fidelity (Cohen's d — under 0.2 is small effect, indicates good fidelity).
-3. Utility gap (positive means synthetic loses utility; under 0.05 is excellent).
+When asked to evaluate a synthetic dataset, call each of the three tools exactly once,
+with the real and synthetic paths you were given and, for tstr_xgboost, the target column
+you were given. Then write a short plain-English report.
 
-Be honest. If the data is poor on any axis, say so.
-Note that the target column should not be interpreted as a fidelity issue
-when it appears in Cohen's d output — it's a label, not a feature."""
+Thresholds (the only thresholds you may use):
+- A categorical column is flagged when its JS distance is above {JS_THRESHOLD}.
+- A numerical column is flagged when its Cohen's d is above {COHEN_D_THRESHOLD}.
+- Utility is poor when the utility gap (TRTR accuracy minus TSTR accuracy) is above
+  {UTILITY_GAP_THRESHOLD}. A gap at or below 0 is good: the synthetic data lost no utility.
+
+Verdict rules (apply them mechanically):
+- categorical fidelity is "poor" if any categorical column is flagged, otherwise "good".
+- numerical fidelity is "poor" if any numerical column is flagged, otherwise "good".
+- utility is "poor" if the gap is above its threshold, otherwise "good".
+- overall is "excellent" when all three axes are good, "poor" when utility is poor, and
+  "acceptable" when utility is good but at least one fidelity axis is poor.
+
+Rules for the report:
+- You are a reporter, not a calculator. Quote numbers exactly as the tools returned them
+  (rounding is fine). Never compute a new figure of your own: no means, counts, ratios,
+  differences, percentages or factors that are not in a tool result.
+- Do not introduce any threshold other than the ones above.
+- Name a column as a problem only if its own tool result crosses its threshold. If utility
+  is poor but no column crosses a fidelity threshold, say that the cause is not visible in
+  the univariate fidelity metrics; do not guess which column is responsible.
+- The target column appears in the Cohen's d output because it is numeric. It is a label,
+  not a feature: never flag it.
+- State the overall verdict plainly in the first lines. Name every flagged column with its
+  value and the threshold it crossed. Explain each metric in one sentence a non-specialist
+  can follow. Mention the caveats that matter (a negative gap, a small test set, a utility
+  problem whose cause is not visible). Be honest: if the data is poor on any axis, say so.
+
+End the report with exactly one fenced JSON block of this form, and nothing after it:
+
+```json
+{{"verdict": {{"categorical": "good|poor", "numerical": "good|poor", "utility": "good|poor",
+             "overall": "excellent|acceptable|poor"}},
+ "flagged_columns": ["column", "..."]}}
+```
+"""
 
 TOOLS: list[ToolParam] = [
     {
         "name": "js_divergence_categorical",
         "description": (
             "Compute the Jensen-Shannon distance between the real and synthetic "
-            "datasets for each categorical column. Returns a per-column dict, "
-            "the mean across columns, and the column count. Smaller values mean "
-            "the synthetic categorical distributions are closer to real."
+            "datasets for each categorical column. The distance ranges from 0 "
+            "(identical distributions) to 1 (completely different). Returns a "
+            "per-column dict, the mean across columns, and the column count. Smaller "
+            "values mean the synthetic categorical distributions are closer to real."
         ),
         "input_schema": {
             "type": "object",
@@ -65,8 +133,7 @@ TOOLS: list[ToolParam] = [
         "description": (
             "Compute absolute Cohen's d effect size between the real and synthetic "
             "datasets for each numerical column. Returns a per-column dict, the mean "
-            "across columns, and the column count. Cohen's d roughly interprets as: "
-            "0.2 = small effect, 0.5 = medium, 0.8 = large. Smaller values mean the "
+            "across columns, and the column count. Smaller values mean the "
             "synthetic numerical distributions are closer to real."
         ),
         "input_schema": {
@@ -120,7 +187,7 @@ TOOLS: list[ToolParam] = [
             },
             "required": ["real_csv_path", "synth_csv_path", "target_column"],
         },
-    },    
+    },
 ]
 
 TOOL_REGISTRY: dict[str, Callable[..., FidelityResult | UtilityResult]] = {
@@ -129,63 +196,129 @@ TOOL_REGISTRY: dict[str, Callable[..., FidelityResult | UtilityResult]] = {
     "tstr_xgboost": tstr_xgboost,
 }
 
-def run_tool(tool_name: str, tool_input: dict[str, Any]) -> Mapping[str, Any]:
-    """Dispatch a tool call by name. Returns the tool's result dict."""
+
+@dataclass
+class ToolCall:
+    """One tool invocation made by the model, with what came back."""
+
+    name: str
+    input: dict[str, Any]
+    result: Mapping[str, Any]
+    is_error: bool = False
+
+
+@dataclass
+class Usage:
+    """Token usage summed over every API call of one run."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def add(self, input_tokens: int, output_tokens: int) -> None:
+        self.input_tokens += input_tokens
+        self.output_tokens += output_tokens
+
+
+@dataclass
+class AgentRun:
+    """Everything the harness needs to grade one agent run."""
+
+    text: str
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    usage: Usage = field(default_factory=Usage)
+    stop_reason: str = ""
+    model_requested: str = DEFAULT_MODEL
+    model_served: str = ""
+    system_prompt: str = SYSTEM_PROMPT
+    user_prompt: str = ""
+    messages: list[Any] = field(default_factory=list)
+
+    def __str__(self) -> str:
+        return self.text
+
+
+def run_tool(tool_name: str, tool_input: dict[str, Any]) -> tuple[Mapping[str, Any], bool]:
+    """Dispatch a tool call by name. Returns ``(result, is_error)``."""
     if tool_name not in TOOL_REGISTRY:
-        return {"error": f"Unknown tool: {tool_name}"}
+        return {"error": f"Unknown tool: {tool_name}"}, True
     try:
-        return TOOL_REGISTRY[tool_name](**tool_input)
-    except Exception as e:
-        return {"error": str(e)}
+        return TOOL_REGISTRY[tool_name](**tool_input), False
+    except Exception as e:  # noqa: BLE001 - the error text is what the model needs to see
+        return {"error": f"{type(e).__name__}: {e}"}, True
 
 
-def run_agent(user_prompt: str, max_turns: int = 10) -> str:
-    """Run the agent loop until Claude stops calling tools."""
+def run_agent(
+    user_prompt: str,
+    max_turns: int = 10,
+    *,
+    model: str = DEFAULT_MODEL,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+) -> AgentRun:
+    """Run the agent loop until Claude stops calling tools.
+
+    Returns an :class:`AgentRun`. ``str(run)`` (or ``run.text``) is the report.
+    ``stop_reason`` is the API's stop reason of the last response, or
+    ``"max_turns"`` if the loop was exhausted.
+    """
+    client = get_client()
     messages: list[MessageParam] = [{"role": "user", "content": user_prompt}]
+    run = AgentRun(text="", model_requested=model, user_prompt=user_prompt)
 
-    for turn in range(max_turns):
+    for _turn in range(max_turns):
         response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=2048,
+            model=model,
+            max_tokens=max_tokens,
             tools=TOOLS,
             messages=messages,
             system=SYSTEM_PROMPT,
         )
+        run.usage.add(response.usage.input_tokens, response.usage.output_tokens)
+        run.model_served = response.model
+        run.stop_reason = str(response.stop_reason)
 
         # Append Claude's response to the conversation
         messages.append({"role": "assistant", "content": response.content})
 
         # If Claude is done calling tools, return the text
         if response.stop_reason != "tool_use":
-            # Pull text out of the final response
-            for block in response.content:
-                if block.type == "text":
-                    return block.text
-            return "(no text response)"
+            run.text = "\n\n".join(
+                block.text for block in response.content if block.type == "text"
+            )
+            run.messages = messages
+            return run
 
         # Otherwise, run each tool and append the results
         tool_results: list[ToolResultBlockParam] = []
         for block in response.content:
             if block.type == "tool_use":
-                result = run_tool(block.name, block.input)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": json.dumps(result),
-                })
+                tool_input = dict(block.input) if isinstance(block.input, Mapping) else {}
+                result, is_error = run_tool(block.name, tool_input)
+                run.tool_calls.append(
+                    ToolCall(name=block.name, input=tool_input, result=result, is_error=is_error)
+                )
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result),
+                        "is_error": is_error,
+                    }
+                )
         messages.append({"role": "user", "content": tool_results})
 
-    return "(max turns reached)"
+    run.stop_reason = "max_turns"
+    run.messages = messages
+    return run
+
 
 if __name__ == "__main__":
-
     user_prompt = (
         "Evaluate the synthetic dataset at examples/synth_sample.csv "
         "against the real dataset at examples/real_sample.csv. "
         "The target column for utility evaluation is 'target'."
     )
-    final_response = run_agent(user_prompt)
-    print(final_response)
+    final_run = run_agent(user_prompt)
+    print(final_run.text)
 
-    path = save_report(final_response)
+    path = save_report(final_run)
     print(f"\nReport saved to: {path}")

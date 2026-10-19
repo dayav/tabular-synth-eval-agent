@@ -1,0 +1,19 @@
+{
+  "description": "The synthetic file is an exact copy of the real file.",
+  "construction": "synth = real",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost"
+  ],
+  "verdict": {
+    "categorical": "good",
+    "numerical": "good",
+    "utility": "good",
+    "overall": "excellent"
+  },
+  "flagged_columns": [],
+  "notes": "Every JS distance and Cohen's d is exactly 0. The utility gap is strongly negative because the synthetic-trained model has seen the held-out real rows; a gap at or below zero is good utility, and the report must not call it a problem."
+}

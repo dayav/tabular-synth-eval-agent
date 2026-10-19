@@ -1,0 +1,26 @@
+"""<One line: the failure this test pins.>
+
+Provenance: recorded (<eval run folder>, <date>) | observed tool bug | constructed from the oracle report.
+<Two or three sentences: what the agent did, why it is wrong, what was changed.>
+
+To add a recorded failure in under five minutes:
+1. copy the transcript from evals/results/<run>/transcripts/<case>_<i>.json to regression/fixtures/<short_name>.json
+2. copy this file to regression/test_<short_name>.py
+3. keep the assertion that the checker catches it; delete the rest.
+"""
+
+from __future__ import annotations
+
+from evals.cases import Case
+from evals.checks.numeric_faithfulness import check_numeric_faithfulness
+from evals.checks.verdict import check_verdict
+from regression.helpers import load_fixture, prompts_for
+
+
+def test_checker_catches_the_recorded_failure(cases: list[Case]) -> None:
+    fx = load_fixture("<short_name>.json")
+    case = next(c for c in cases if c.name == fx["case"])
+    results = [tc["result"] for tc in fx["tool_calls"]]
+    numeric = check_numeric_faithfulness(fx["report"], results, *prompts_for(case, fx["prompt"]))
+    verdict = check_verdict(fx["report"], case.expected)
+    assert not (numeric.passed and verdict.passed), "the checkers no longer catch this failure"

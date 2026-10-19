@@ -1,0 +1,21 @@
+{
+  "description": "The clean synthetic draw with every phd relabelled master.",
+  "construction": "synth = clean; synth.education[education == 'phd'] = 'master'",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost"
+  ],
+  "verdict": {
+    "categorical": "poor",
+    "numerical": "good",
+    "utility": "good",
+    "overall": "acceptable"
+  },
+  "flagged_columns": [
+    "education"
+  ],
+  "notes": "One categorical level disappears, so the JS distance on education is well above 0.1. Education carries no signal about the label, so utility is fine."
+}

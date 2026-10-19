@@ -1,0 +1,105 @@
+{
+ "model_requested": "claude-sonnet-5-5",
+ "models_served": [
+  "claude-sonnet-5-5"
+ ],
+ "judge_model": "claude-opus-5-5",
+ "rubric_hash": "6bb2ff45a47d",
+ "timestamp": "2026-10-18T23:54:15+00:00",
+ "cases": [
+  "age_x10",
+  "clean_synthetic",
+  "identical",
+  "income_shuffled",
+  "phd_missing",
+  "score_leaks_target"
+ ],
+ "runs_per_case": 3,
+ "n_scored": 18,
+ "n_failed": 0,
+ "failures": {},
+ "noise_floor": 0.236,
+ "tool_selection": {
+  "passed": 18,
+  "n": 18,
+  "rate": 1.0
+ },
+ "numeric_faithfulness": {
+  "numbers_grounded": 299,
+  "numbers_total": 299,
+  "rate": 1.0
+ },
+ "runs_with_no_invented_number": {
+  "passed": 18,
+  "n": 18,
+  "rate": 1.0
+ },
+ "verdict": {
+  "passed": 18,
+  "n": 18,
+  "rate": 1.0
+ },
+ "all_three_checks": {
+  "passed": 18,
+  "n": 18,
+  "rate": 1.0
+ },
+ "clarity": {
+  "mean": 4.744444444444444,
+  "n_judged": 18
+ },
+ "agent_tokens": {
+  "input": 95323,
+  "output": 19101
+ },
+ "judge_tokens": {
+  "input": 35169,
+  "output": 8930
+ },
+ "mean_latency_s": 8.7,
+ "per_case": {
+  "age_x10": {
+   "n": 3,
+   "tool_sequence": 3,
+   "numeric_faithfulness": 3,
+   "verdict": 3,
+   "ungrounded": []
+  },
+  "clean_synthetic": {
+   "n": 3,
+   "tool_sequence": 3,
+   "numeric_faithfulness": 3,
+   "verdict": 3,
+   "ungrounded": []
+  },
+  "identical": {
+   "n": 3,
+   "tool_sequence": 3,
+   "numeric_faithfulness": 3,
+   "verdict": 3,
+   "ungrounded": []
+  },
+  "income_shuffled": {
+   "n": 3,
+   "tool_sequence": 3,
+   "numeric_faithfulness": 3,
+   "verdict": 3,
+   "ungrounded": []
+  },
+  "phd_missing": {
+   "n": 3,
+   "tool_sequence": 3,
+   "numeric_faithfulness": 3,
+   "verdict": 3,
+   "ungrounded": []
+  },
+  "score_leaks_target": {
+   "n": 3,
+   "tool_sequence": 3,
+   "numeric_faithfulness": 3,
+   "verdict": 3,
+   "ungrounded": []
+  }
+ },
+ "rejudged_at": "2026-10-18T23:59:41+00:00"
+}

@@ -21,7 +21,23 @@ dependencies = [
 dev = [
     "mypy",
     "pandas-stubs",
+    "pytest",
+    "ruff",
+    "matplotlib",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "regression"]
+pythonpath = [".", "src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

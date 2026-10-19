@@ -1,0 +1,98 @@
+{
+ "case": "age_x10",
+ "provenance": "recorded live on 2026-10-18 (eval run 20261018_235325_claude-sonnet-4-6, transcript age_x10_2): claude-sonnet-4-6 wrote 'more than 24 times the flagging threshold', a ratio it computed from 4.909 / 0.2; no tool result contains 24",
+ "model_served": "claude-sonnet-4-6",
+ "prompt": "Evaluate the synthetic dataset at /tmp/evalrun_0ptmyhy5/eval_fdudse/synth.csv against the real dataset at /tmp/evalrun_0ptmyhy5/eval_fdudse/real.csv. The target column for utility evaluation is 'target'.",
+ "tool_calls": [
+  {
+   "name": "js_divergence_categorical",
+   "input": {
+    "real_csv_path": "/tmp/evalrun_0ptmyhy5/eval_fdudse/real.csv",
+    "synth_csv_path": "/tmp/evalrun_0ptmyhy5/eval_fdudse/synth.csv"
+   },
+   "result": {
+    "per_column": {
+     "gender": 0.016991498647069305,
+     "education": 0.018654699529737424,
+     "city": 0.01925583073782493
+    },
+    "mean": 0.01830067630487722,
+    "n_columns": 3
+   },
+   "is_error": false
+  },
+  {
+   "name": "cohen_d_numerical",
+   "input": {
+    "real_csv_path": "/tmp/evalrun_0ptmyhy5/eval_fdudse/real.csv",
+    "synth_csv_path": "/tmp/evalrun_0ptmyhy5/eval_fdudse/synth.csv"
+   },
+   "result": {
+    "per_column": {
+     "age": 4.908707644609732,
+     "income": 0.04272755777723116,
+     "score": 0.05674530819766131,
+     "target": 0.02899609108561429
+    },
+    "mean": 1.2592941504175597,
+    "n_columns": 4
+   },
+   "is_error": false
+  },
+  {
+   "name": "tstr_xgboost",
+   "input": {
+    "real_csv_path": "/tmp/evalrun_0ptmyhy5/eval_fdudse/real.csv",
+    "synth_csv_path": "/tmp/evalrun_0ptmyhy5/eval_fdudse/synth.csv",
+    "target_column": "target"
+   },
+   "result": {
+    "tstr_accuracy": 0.7675,
+    "trtr_accuracy": 0.7675,
+    "utility_gap": 0.0,
+    "target_column": "target",
+    "n_test_samples": 400,
+    "n_classes": 2
+   },
+   "is_error": false
+  }
+ ],
+ "report": "All three evaluations are complete. Here is the full report.\n\n---\n\n## Synthetic Data Evaluation Report\n\n### Overall Verdict: **ACCEPTABLE**\n\nThe synthetic data has **excellent utility** and **good categorical fidelity**, but **poor numerical fidelity** due to one severely flagged column (`age`). As a result, the overall verdict is **acceptable**.\n\n---\n\n### 1. Categorical Fidelity \u2014 \u2705 GOOD\n\nJensen-Shannon (JS) distance measures how similarly distributed each categorical column is between the real and synthetic data. A value of 0 means identical; values above **0.1** are flagged.\n\n| Column | JS Distance | Flagged? |\n|---|---|---|\n| gender | 0.0170 | No |\n| education | 0.0187 | No |\n| city | 0.0193 | No |\n\nAll three categorical columns are well within the threshold. The synthetic data faithfully reproduces the category distributions.\n\n---\n\n### 2. Numerical Fidelity \u2014 \u274c POOR\n\nCohen's d measures the difference in means between real and synthetic distributions, scaled by variability. Values above **0.2** are flagged. (`target` is the classification label, not a feature, and is excluded from flagging.)\n\n| Column | Cohen's d | Flagged? |\n|---|---|---|\n| **age** | **4.91** | \u2705 **YES \u2014 far exceeds 0.2** |\n| income | 0.043 | No |\n| score | 0.057 | No |\n| target | 0.029 | (label \u2014 not evaluated) |\n\nThe `age` column is a serious concern, with a Cohen's d of **4.91** \u2014 more than 24 times the flagging threshold of 0.2. This means the synthetic `age` distribution diverges dramatically from the real one. `income` and `score` are both comfortably within acceptable range.\n\n---\n\n### 3. Predictive Utility \u2014 \u2705 GOOD\n\nThe Train-on-Synthetic, Test-on-Real (TSTR) evaluation trains an XGBoost model on synthetic data and tests it on real held-out data, comparing it to a model trained on real data. A utility gap (TRTR accuracy \u2212 TSTR accuracy) above **0.05** indicates a problem.\n\n| Metric | Value |\n|---|---|\n| TSTR Accuracy (trained on synthetic) | 76.75% |\n| TRTR Accuracy (trained on real) | 76.75% |\n| Utility Gap | **0.0** |\n| Test Samples | 400 |\n\nThe utility gap is exactly **0.0**, meaning the synthetic data is just as useful as real data for training a classifier. This is an ideal result.\n\n---\n\n### Summary of Findings\n\n- **`age`** is severely distorted in the synthetic data (Cohen's d = 4.91), making numerical fidelity poor.\n- Despite this, the synthetic data produces **identical predictive utility** to the real data on a 400-sample test set \u2014 though users should be cautious, as the `age` distortion may impact other downstream use cases.\n- All categorical columns are accurately reproduced.\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"poor\", \"utility\": \"good\",\n             \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"age\"]}\n```",
+ "checks_at_recording": {
+  "tool_sequence": {
+   "name": "tool_sequence",
+   "passed": true,
+   "calls": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost"
+   ],
+   "problems": []
+  },
+  "numeric_faithfulness": {
+   "name": "numeric_faithfulness",
+   "passed": false,
+   "numbers_total": 22,
+   "numbers_grounded": 21,
+   "ungrounded": [
+    "24"
+   ]
+  },
+  "verdict": {
+   "name": "verdict",
+   "passed": true,
+   "problems": [],
+   "got": {
+    "verdict": {
+     "categorical": "good",
+     "numerical": "poor",
+     "utility": "good",
+     "overall": "acceptable"
+    },
+    "flagged_columns": [
+     "age"
+    ]
+   }
+  }
+ }
+}

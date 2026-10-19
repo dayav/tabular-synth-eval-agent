@@ -1,0 +1,19 @@
+{
+  "description": "The clean synthetic draw with score replaced by 70 +/- 10 according to the label.",
+  "construction": "synth = clean; synth.score = 80 where target == 1 else 60",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost"
+  ],
+  "verdict": {
+    "categorical": "good",
+    "numerical": "good",
+    "utility": "poor",
+    "overall": "poor"
+  },
+  "flagged_columns": [],
+  "notes": "Same mean and spread as the real score column, so Cohen's d stays under 0.2, but the two classes are perfectly separable. A model trained on it learns a rule that is only weakly true in real data and loses accuracy. The report must NOT name score as the cause: no tool result points at it."
+}

@@ -4,7 +4,7 @@ An LLM agent that evaluates the quality of synthetic tabular data against a real
 
 It is built on the evaluation methodology from my master's thesis on privacy-preserving synthetic tabular data ([paper](https://arxiv.org/abs/2602.06390) · [thesis pipeline](https://github.com/dayav/pipeline_synthetic_tabular_data)) and is powered by Claude through the Anthropic SDK's native tool use.
 
-> **Status:** Work in progress (MVP).
+> **Status:** MVP agent plus an evaluation harness and regression suite for the agent itself (v2 phase 1). Not deployed; no traffic beyond the author's own runs.
 
 ## How it works
 
@@ -22,7 +22,8 @@ You give the agent the path to a real dataset and the path to a synthetic versio
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt          # the agent
+pip install -e ".[dev]"                  # plus pytest, ruff, mypy, matplotlib for the harness and figures
 ```
 
 The agent calls the Anthropic API, so it needs an API key. Copy the example file and fill in your key:
@@ -55,12 +56,14 @@ prompt = (
     "The target column for utility evaluation is 'target'."
 )
 
-# run_agent returns the agent's plain-English assessment as a string
-assessment = run_agent(prompt)
-print(assessment)
+# run_agent returns an AgentRun: the report plus the tool trace, token usage,
+# stop reason and the model that served the request. str(run) is the report.
+run = run_agent(prompt)                      # run_agent(prompt, model="claude-haiku-5-5") to pick a model
+print(run.text)
+print([call.name for call in run.tool_calls], run.usage)
 
-# save_report writes that assessment to a timestamped Markdown file (report.md by default)
-path = save_report(assessment)
+# save_report writes the report to a timestamped Markdown file (report.md by default)
+path = save_report(run)
 print(f"Report saved to: {path}")
 ```
 
@@ -81,28 +84,59 @@ Run on the bundled sample data, the agent produces something like this:
 >
 > *[...continues with numerical fidelity and utility evaluation. Full report at [report.md](report.md).]*
 
+## Evaluating the agent
+
+An agent that grades data but is never itself graded is not much of a tool, so the repository ships an evaluation harness for the agent and a regression suite that runs on every commit. The design is explained from first principles, with figures and references, in [notes/eval_harness.md](notes/eval_harness.md).
+
+In short: six real/synthetic pairs are built so that the right answer is known by construction (an exact copy, a clean re-draw, a shuffled column, a leaked label, a column scaled ×10, a missing category level). `make eval` runs the agent on each of them N times and checks three things mechanically: did it call the right tools, is every number in its report traceable to a tool result or the prompt, and is its verdict right. A second model scores clarity against a fixed rubric. `make regression` replays recorded failures through the checkers in a few seconds, without calling the model.
+
+```bash
+make test                                   # unit tests for the tools + regression suite, no API key needed
+make eval MODEL=claude-sonnet-5-5 RUNS=3    # live eval, judge defaults to claude-opus-5-5
+make eval-nojudge MODEL=claude-haiku-5-5    # mechanical checks only
+make compare                                # one row per saved results folder
+```
+
+Measured on 2026-10-18, six cases × three runs per model, judge `claude-opus-5-5`, no run lost to API errors or truncation:
+
+| model | tool-selection | numeric faithfulness | runs with no invented number | verdict | clarity (1–5, judge) |
+|---|---|---|---|---|---|
+| claude-sonnet-4-6 | 100% (18/18) | 99.8% (404/405) | 94% (17/18) | 100% (18/18) | 3.96 |
+| claude-sonnet-5-5 | 100% (18/18) | 100% (299/299) | 100% (18/18) | 100% (18/18) | 4.74 |
+| claude-haiku-5-5 | 100% (18/18) | 100% (275/275) | 100% (18/18) | 100% (18/18) | 4.64 |
+
+The one failure: Sonnet 4.6 wrote that a Cohen's d of 4.909 was "more than 24 times the flagging threshold", a ratio it computed itself; that transcript is now a regression fixture. At eighteen runs the noise floor on a pass rate is about ±24 points, so the faithfulness difference is one observation, not a result; the clarity gap is the only difference that clears the floor.
+
+Read these as measured on six synthetic cases with thresholds given in the prompt; they support "the harness measures tool selection, numeric faithfulness and verdict correctness across model versions and catches subtle failures", not fine-grained quality claims. The judge is uncalibrated against human ratings. Details, the failures found, and the noise floor are in the note.
+
 ## Project structure
 
 ```
 src/
-  agent.py     # Agent loop: sends the prompt to Claude and dispatches tool calls
-  tools.py     # The three evaluation tools (JS distance, Cohen's d, TSTR/XGBoost)
-  report.py    # Writes the agent's assessment to a Markdown report
-examples/      # Sample real and synthetic CSVs
-notes/         # Project scope and design notes
+  agent.py       # Agent loop: sends the prompt to Claude, dispatches tool calls, returns an AgentRun
+  tools.py       # The three evaluation tools (JS distance, Cohen's d, TSTR/XGBoost)
+  report.py      # Writes the agent's assessment to a Markdown report
+evals/           # Golden cases, checkers, LLM judge, eval runner (make eval)
+regression/      # Deterministic pytest suite replaying recorded failures (make regression)
+tests/           # Known-answer unit tests for the tools
+examples/        # Sample real and synthetic CSVs
+notes/           # Scope, the eval-harness note and its generated figures
+CHANGELOG.md
+Makefile
 ```
 
 ## Roadmap
 
+v2, in order (phase 1 is done):
 
-Likely v2: 
-- Add a privacy evaluation tool (HEOM-based identifiability epsilon, from the thesis pipeline). 
+1. ~~Agent eval harness and regression suite~~
+2. Run logging: per-run folder with trace, latency, tokens, cost
+3. FastAPI service, Dockerfile, CI with the regression suite as a gate, a public demo deployment
+4. Privacy tool (HEOM-based identifiability, from the thesis pipeline)
+5. Retrieval over metric documentation so thresholds come from the docs
+6. An LLM tabular-generation baseline evaluated by the same agent
 
-Out of scope for v1 (planned for later):
-
-- Multivariate fidelity (correlation matrices, joint distributions)
-- Framework-based orchestration (e.g. LangGraph)
-- A web UI / API endpoint
+Out of scope: multivariate fidelity (correlation matrices, joint distributions), framework-based orchestration (e.g. LangGraph), a web UI.
 
 ## License
 

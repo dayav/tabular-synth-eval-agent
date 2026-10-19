@@ -1,0 +1,19 @@
+{
+  "description": "The clean synthetic draw with the income column permuted within itself.",
+  "construction": "synth = clean; synth.income = permutation(synth.income)",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost"
+  ],
+  "verdict": {
+    "categorical": "good",
+    "numerical": "good",
+    "utility": "poor",
+    "overall": "poor"
+  },
+  "flagged_columns": [],
+  "notes": "A permutation keeps the marginal distribution, so Cohen's d on income is the same as on the clean control. It destroys the joint distribution with the label, so TSTR drops. Nothing in the tool output points at income: the report must NOT name it as the cause."
+}

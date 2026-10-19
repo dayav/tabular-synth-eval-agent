@@ -2,13 +2,12 @@
 
 from typing import TypedDict
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy.spatial.distance import jensenshannon
-
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
 from xgboost import XGBClassifier
 
 
@@ -60,20 +59,24 @@ def js_divergence_categorical(real_csv_path: str, synth_csv_path: str) -> Fideli
     per_column: dict[str, float | None] = {}
 
     for feature in categorical_features :
-        categories = real_data[feature].unique()
+        # Reindex on the union of levels: a level that exists only in the synthetic
+        # file is a real distributional difference and must not be dropped.
+        categories = pd.unique(
+            pd.concat([real_data[feature], synthetic_data[feature]], ignore_index=True).dropna()
+        )
         n_real = real_data[feature].shape[0]
         n_synthetic = synthetic_data[feature].shape[0]
 
         real_count = (
             real_data[feature]
             .value_counts()
-            .reindex(categories, fill_value=1e-7)
+            .reindex(categories, fill_value=0.0)
         )
 
         synthetic_count = (
             synthetic_data[feature]
             .value_counts()
-            .reindex(categories, fill_value=1e-7)
+            .reindex(categories, fill_value=0.0)
         )
 
 

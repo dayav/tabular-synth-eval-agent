@@ -1,0 +1,60 @@
+{
+ "case": "clean_synthetic",
+ "provenance": "reconstructed on 2026-10-18 from the full-run failure recorded on 2026-10-15 (claude-sonnet-4-6 wrote a mean of its own rounding; the tool's mean is 0.03856064535379407)",
+ "prompt": "Evaluate the synthetic dataset at /workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/synth.csv against the real dataset at /workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/real.csv. The target column for utility evaluation is 'target'.",
+ "tool_calls": [
+  {
+   "name": "js_divergence_categorical",
+   "input": {
+    "real_csv_path": "/workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/real.csv",
+    "synth_csv_path": "/workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/synth.csv"
+   },
+   "result": {
+    "per_column": {
+     "gender": 0.016991498647069305,
+     "education": 0.018654699529737424,
+     "city": 0.01925583073782493
+    },
+    "mean": 0.01830067630487722,
+    "n_columns": 3
+   },
+   "is_error": false
+  },
+  {
+   "name": "cohen_d_numerical",
+   "input": {
+    "real_csv_path": "/workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/real.csv",
+    "synth_csv_path": "/workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/synth.csv"
+   },
+   "result": {
+    "per_column": {
+     "age": 0.025773624354669494,
+     "income": 0.04272755777723116,
+     "score": 0.05674530819766131,
+     "target": 0.02899609108561429
+    },
+    "mean": 0.03856064535379407,
+    "n_columns": 4
+   },
+   "is_error": false
+  },
+  {
+   "name": "tstr_xgboost",
+   "input": {
+    "real_csv_path": "/workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/real.csv",
+    "synth_csv_path": "/workspaces/tabular-synth-eval-agent/evals/cases/clean_synthetic/synth.csv",
+    "target_column": "target"
+   },
+   "result": {
+    "tstr_accuracy": 0.775,
+    "trtr_accuracy": 0.7675,
+    "utility_gap": -0.007500000000000062,
+    "target_column": "target",
+    "n_test_samples": 400,
+    "n_classes": 2
+   },
+   "is_error": false
+  }
+ ],
+ "report": "**Overall verdict: excellent.** Categorical fidelity is good, numerical fidelity is good, utility is good.\n\n## Categorical fidelity (Jensen-Shannon distance, flagged above 0.1)\nJS distance measures how far apart two category frequency tables are; 0 means identical.\n- gender: 0.016991498647069305\n- education: 0.018654699529737424\n- city: 0.01925583073782493\n\n## Numerical fidelity (Cohen's d, flagged above 0.2)\nCohen's d is the difference in means in units of the pooled standard deviation.\n- age: 0.025773624354669494\n- income: 0.04272755777723116\n- score: 0.05674530819766131\n- target: 0.02899609108561429 (this is the label column, not a feature; not assessed)\nMean Cohen's d across the numerical columns: 0.0387.\n\n## Utility (train on synthetic, test on real; poor above 0.05)\nTSTR accuracy 0.775 against a TRTR baseline of 0.7675 on 400 held-out real rows gives a utility gap of -0.007500000000000062.\nA gap at or below zero means the synthetic data lost no utility.\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"good\", \"utility\": \"good\", \"overall\": \"excellent\"}, \"flagged_columns\": []}\n```"
+}
