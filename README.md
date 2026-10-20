@@ -123,7 +123,7 @@ curl -s -F real=@examples/real_sample.csv -F synthetic=@examples/synth_sample.cs
 make docker-build && make docker-run                    # same service in the container, runs/ mounted
 ```
 
-The multi-stage [Dockerfile](Dockerfile) installs the pinned [requirements.lock](requirements.lock) in a builder stage and ships a slim, non-root runtime with a health check. [CI](.github/workflows/ci.yml) runs lint, types, unit tests, the regression suite and the API tests on every PR; on `main` it also runs a cheap live eval (Haiku, one run per case), builds and publishes the image to GHCR, and, if the Azure variables are set, rolls the public demo deployment. The exact Azure setup is in [docs/deploy.md](docs/deploy.md).
+The multi-stage [Dockerfile](Dockerfile) installs the pinned [requirements.lock](requirements.lock) in a builder stage and ships a slim, non-root runtime with a health check. [CI](.github/workflows/ci.yml) runs lint, types, unit tests, the regression suite and the API tests on every PR; on `main` it also runs a cheap live eval (Haiku, one run per case), builds and publishes the image to GHCR, and, if the Azure variables are set, rolls the public demo deployment. The exact Azure setup is in [docs/deploy.md](docs/deploy.md); the design, with figures and references, is in [notes/service_and_deployment.md](notes/service_and_deployment.md) and the code walkthrough in [notes/service_and_deployment_code_walkthrough.md](notes/service_and_deployment_code_walkthrough.md).
 
 **Deployment status:** the image builds and serves locally; the Azure Container Apps demo is documented and wired into CI but **not yet live**. When it is, the URL goes here and nowhere else, labelled "public demo deployment".
 

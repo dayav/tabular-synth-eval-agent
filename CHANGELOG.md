@@ -22,6 +22,9 @@
 - `tests/test_api.py` (real app, real loop, fake model) and `tests/fake_client.py`
   (shared scripted client, now also used by the run-logging tests).
 - `make api`, `make docker-build`, `make docker-run`, `make lock`.
+- `notes/service_and_deployment.md` (design, figures, references) and
+  `notes/service_and_deployment_code_walkthrough.md` (file-by-file); diagrams from
+  `notes/figures/make_service_figures.py`.
 
 ### Changed
 - `pyproject.toml`: version 0.3.0; `fastapi`, `uvicorn`, `python-multipart`, `pydantic`
