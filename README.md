@@ -60,7 +60,7 @@ prompt = (
 # stop reason and the model that served the request. str(run) is the report.
 run = run_agent(prompt)                      # run_agent(prompt, model="claude-haiku-5-5") to pick a model
 print(run.text)
-print([call.name for call in run.tool_calls], run.usage)
+print([call.name for call in run.tool_calls], run.usage, run.latency_s, run.log_dir)
 
 # save_report writes the report to a timestamped Markdown file (report.md by default)
 path = save_report(run)
@@ -83,6 +83,24 @@ Run on the bundled sample data, the agent produces something like this:
 > The overall mean JS distance of 0.073 is just under the 0.1 threshold... `gender` stands out with a score of 0.174 and warrants attention. `education` is perfectly replicated.
 >
 > *[...continues with numerical fidelity and utility evaluation. Full report at [report.md](report.md).]*
+
+## Run logging
+
+Every run writes a folder under `runs/` with what went in, what happened, and what it cost:
+
+```
+runs/20261019_001530_3f9a1c/
+  meta.json    model requested and served, prompt, input files (bytes, sha256, rows, columns), status, timings
+  trace.json   one entry per API step: latency, tokens, request id, and the tool calls it triggered with their latency
+  usage.json   token totals, API vs tool latency, estimated cost and the pricing date it rests on
+  report.md    the report
+```
+
+```bash
+make runs                 # one row per run: model, latency, tokens, estimated cost, verdict
+```
+
+Pass `log_dir=None` to `run_agent` to skip logging. Cost is an estimate from list prices in `src/pricing.py`, dated in every `usage.json`; a model missing from the table is reported as unpriced rather than guessed. One real run is committed under [runs/example/](runs/example/).
 
 ## Evaluating the agent
 
@@ -117,6 +135,7 @@ src/
   tools.py       # The three evaluation tools (JS distance, Cohen's d, TSTR/XGBoost)
   report.py      # Writes the agent's assessment to a Markdown report
 evals/           # Golden cases, checkers, LLM judge, eval runner (make eval)
+runs/            # Per-run logs: trace, latency, tokens, cost (make runs); one example committed
 regression/      # Deterministic pytest suite replaying recorded failures (make regression)
 tests/           # Known-answer unit tests for the tools
 examples/        # Sample real and synthetic CSVs
@@ -127,10 +146,10 @@ Makefile
 
 ## Roadmap
 
-v2, in order (phase 1 is done):
+v2, in order (phases 1 and 2 are done):
 
 1. ~~Agent eval harness and regression suite~~
-2. Run logging: per-run folder with trace, latency, tokens, cost
+2. ~~Run logging: per-run folder with trace, latency, tokens, cost~~
 3. FastAPI service, Dockerfile, CI with the regression suite as a gate, a public demo deployment
 4. Privacy tool (HEOM-based identifiability, from the thesis pipeline)
 5. Retrieval over metric documentation so thresholds come from the docs

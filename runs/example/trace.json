@@ -1,0 +1,85 @@
+[
+ {
+  "turn": 0,
+  "latency_s": 4.11,
+  "input_tokens": 1873,
+  "output_tokens": 292,
+  "cache_read_input_tokens": 0,
+  "cache_creation_input_tokens": 0,
+  "stop_reason": "tool_use",
+  "request_id": "req_011CgBZLU8HniczrHyhhVGFi",
+  "n_tool_calls": 3,
+  "tool_calls": [
+   {
+    "name": "js_divergence_categorical",
+    "input": {
+     "real_csv_path": "examples/real_sample.csv",
+     "synth_csv_path": "examples/synth_sample.csv"
+    },
+    "result": {
+     "per_column": {
+      "gender": 0.17408372939284789,
+      "education": 0.0,
+      "city": 0.043871152365593774
+     },
+     "mean": 0.07265162725281389,
+     "n_columns": 3
+    },
+    "is_error": false,
+    "latency_s": 0.013,
+    "turn": 0
+   },
+   {
+    "name": "cohen_d_numerical",
+    "input": {
+     "real_csv_path": "examples/real_sample.csv",
+     "synth_csv_path": "examples/synth_sample.csv"
+    },
+    "result": {
+     "per_column": {
+      "age": 0.08246089730808379,
+      "income": 0.09850359551588002,
+      "score": 0.07069287890724672,
+      "target": 0.0
+     },
+     "mean": 0.06291434293280264,
+     "n_columns": 4
+    },
+    "is_error": false,
+    "latency_s": 0.003,
+    "turn": 0
+   },
+   {
+    "name": "tstr_xgboost",
+    "input": {
+     "real_csv_path": "examples/real_sample.csv",
+     "synth_csv_path": "examples/synth_sample.csv",
+     "target_column": "target"
+    },
+    "result": {
+     "tstr_accuracy": 1.0,
+     "trtr_accuracy": 1.0,
+     "utility_gap": 0.0,
+     "target_column": "target",
+     "n_test_samples": 4,
+     "n_classes": 2
+    },
+    "is_error": false,
+    "latency_s": 0.08,
+    "turn": 0
+   }
+  ]
+ },
+ {
+  "turn": 1,
+  "latency_s": 14.628,
+  "input_tokens": 2450,
+  "output_tokens": 773,
+  "cache_read_input_tokens": 0,
+  "cache_creation_input_tokens": 0,
+  "stop_reason": "end_turn",
+  "request_id": "req_011CgBZLmoQp3HaQY6GumuB2",
+  "n_tool_calls": 0,
+  "tool_calls": []
+ }
+]

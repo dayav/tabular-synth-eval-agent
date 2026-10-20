@@ -8,3 +8,8 @@ __pycache__/
 # eval runs: keep the per-run summaries, not the transcripts
 evals/results/*/transcripts/
 evals/results/*/errors.jsonl
+# run logs: keep the tooling and one example run
+runs/*
+!runs/README.md
+!runs/summarize.py
+!runs/example/

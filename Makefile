@@ -4,7 +4,7 @@ RUNS  ?= 3
 JUDGE ?= claude-opus-5-5
 PY    ?= python
 
-.PHONY: test regression unit eval eval-nojudge compare cases fixtures figures typecheck lint
+.PHONY: test regression unit eval eval-nojudge compare cases fixtures figures typecheck lint runs example
 
 test: unit regression
 
@@ -22,6 +22,12 @@ eval-nojudge:
 
 compare:
 	$(PY) -m evals.compare
+
+runs:
+	$(PY) runs/summarize.py
+
+example:  # one logged run on the bundled sample data; move the folder to runs/example to refresh the committed one
+	$(PY) src/agent.py
 
 cases:
 	$(PY) -m evals.generate_cases

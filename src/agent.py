@@ -10,8 +10,12 @@ from __future__ import annotations
 
 import json
 import os
+import time
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from anthropic import Anthropic
@@ -19,6 +23,7 @@ from anthropic.types import MessageParam, ToolParam, ToolResultBlockParam
 from dotenv import load_dotenv
 
 from report import save_report
+from runlog import DEFAULT_RUNS_DIR, write_run
 from tools import (
     FidelityResult,
     UtilityResult,
@@ -205,6 +210,23 @@ class ToolCall:
     input: dict[str, Any]
     result: Mapping[str, Any]
     is_error: bool = False
+    latency_s: float = 0.0
+    turn: int = 0
+
+
+@dataclass
+class ApiStep:
+    """One API call of the loop: how long it took, what it cost, how it ended."""
+
+    turn: int
+    latency_s: float
+    input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+    stop_reason: str
+    request_id: str | None
+    n_tool_calls: int = 0
 
 
 @dataclass
@@ -213,18 +235,27 @@ class Usage:
 
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
 
-    def add(self, input_tokens: int, output_tokens: int) -> None:
-        self.input_tokens += input_tokens
-        self.output_tokens += output_tokens
+    def add(self, step: ApiStep) -> None:
+        self.input_tokens += step.input_tokens
+        self.output_tokens += step.output_tokens
+        self.cache_read_input_tokens += step.cache_read_input_tokens
+        self.cache_creation_input_tokens += step.cache_creation_input_tokens
+
+
+def new_run_id() -> str:
+    return datetime.now(UTC).strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
 
 
 @dataclass
 class AgentRun:
-    """Everything the harness needs to grade one agent run."""
+    """Everything the harness and the run log need to describe one agent run."""
 
     text: str
     tool_calls: list[ToolCall] = field(default_factory=list)
+    steps: list[ApiStep] = field(default_factory=list)
     usage: Usage = field(default_factory=Usage)
     stop_reason: str = ""
     model_requested: str = DEFAULT_MODEL
@@ -232,6 +263,12 @@ class AgentRun:
     system_prompt: str = SYSTEM_PROMPT
     user_prompt: str = ""
     messages: list[Any] = field(default_factory=list)
+    run_id: str = field(default_factory=new_run_id)
+    started_at: str = ""
+    finished_at: str = ""
+    latency_s: float = 0.0
+    error: str | None = None
+    log_dir: Path | None = None
 
     def __str__(self) -> str:
         return self.text
@@ -253,61 +290,93 @@ def run_agent(
     *,
     model: str = DEFAULT_MODEL,
     max_tokens: int = DEFAULT_MAX_TOKENS,
+    log_dir: str | Path | None = DEFAULT_RUNS_DIR,
 ) -> AgentRun:
     """Run the agent loop until Claude stops calling tools.
 
     Returns an :class:`AgentRun`. ``str(run)`` (or ``run.text``) is the report.
     ``stop_reason`` is the API's stop reason of the last response, or
     ``"max_turns"`` if the loop was exhausted.
+
+    Unless ``log_dir`` is ``None``, the run is written to ``<log_dir>/<run_id>/``
+    (``runs/`` by default) with its inputs, tool trace, per-step latency, token
+    usage, estimated cost and report, even when the run fails part-way.
     """
     client = get_client()
     messages: list[MessageParam] = [{"role": "user", "content": user_prompt}]
     run = AgentRun(text="", model_requested=model, user_prompt=user_prompt)
+    run.started_at = datetime.now(UTC).isoformat(timespec="seconds")
+    t_run = time.perf_counter()
 
-    for _turn in range(max_turns):
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            tools=TOOLS,
-            messages=messages,
-            system=SYSTEM_PROMPT,
-        )
-        run.usage.add(response.usage.input_tokens, response.usage.output_tokens)
-        run.model_served = response.model
-        run.stop_reason = str(response.stop_reason)
-
-        # Append Claude's response to the conversation
-        messages.append({"role": "assistant", "content": response.content})
-
-        # If Claude is done calling tools, return the text
-        if response.stop_reason != "tool_use":
-            run.text = "\n\n".join(
-                block.text for block in response.content if block.type == "text"
+    try:
+        for turn in range(max_turns):
+            t_api = time.perf_counter()
+            response = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                tools=TOOLS,
+                messages=messages,
+                system=SYSTEM_PROMPT,
             )
-            run.messages = messages
-            return run
+            step = ApiStep(
+                turn=turn,
+                latency_s=round(time.perf_counter() - t_api, 3),
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                cache_read_input_tokens=response.usage.cache_read_input_tokens or 0,
+                cache_creation_input_tokens=response.usage.cache_creation_input_tokens or 0,
+                stop_reason=str(response.stop_reason),
+                request_id=getattr(response, "_request_id", None),
+            )
+            run.steps.append(step)
+            run.usage.add(step)
+            run.model_served = response.model
+            run.stop_reason = str(response.stop_reason)
 
-        # Otherwise, run each tool and append the results
-        tool_results: list[ToolResultBlockParam] = []
-        for block in response.content:
-            if block.type == "tool_use":
-                tool_input = dict(block.input) if isinstance(block.input, Mapping) else {}
-                result, is_error = run_tool(block.name, tool_input)
-                run.tool_calls.append(
-                    ToolCall(name=block.name, input=tool_input, result=result, is_error=is_error)
-                )
-                tool_results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(result),
-                        "is_error": is_error,
-                    }
-                )
-        messages.append({"role": "user", "content": tool_results})
+            # Append Claude's response to the conversation
+            messages.append({"role": "assistant", "content": response.content})
 
-    run.stop_reason = "max_turns"
-    run.messages = messages
+            # If Claude is done calling tools, return the text
+            if response.stop_reason != "tool_use":
+                run.text = "\n\n".join(
+                    block.text for block in response.content if block.type == "text"
+                )
+                break
+
+            # Otherwise, run each tool and append the results
+            tool_results: list[ToolResultBlockParam] = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_input = dict(block.input) if isinstance(block.input, Mapping) else {}
+                    t_tool = time.perf_counter()
+                    result, is_error = run_tool(block.name, tool_input)
+                    run.tool_calls.append(
+                        ToolCall(
+                            name=block.name, input=tool_input, result=result, is_error=is_error,
+                            latency_s=round(time.perf_counter() - t_tool, 3), turn=turn,
+                        )
+                    )
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": json.dumps(result),
+                            "is_error": is_error,
+                        }
+                    )
+            step.n_tool_calls = len(tool_results)
+            messages.append({"role": "user", "content": tool_results})
+        else:
+            run.stop_reason = "max_turns"
+    except Exception as e:
+        run.error = f"{type(e).__name__}: {e}"
+        raise
+    finally:
+        run.messages = messages
+        run.finished_at = datetime.now(UTC).isoformat(timespec="seconds")
+        run.latency_s = round(time.perf_counter() - t_run, 3)
+        if log_dir is not None:
+            run.log_dir = write_run(run, log_dir)
     return run
 
 
@@ -322,3 +391,4 @@ if __name__ == "__main__":
 
     path = save_report(final_run)
     print(f"\nReport saved to: {path}")
+    print(f"Run logged to:   {final_run.log_dir}")

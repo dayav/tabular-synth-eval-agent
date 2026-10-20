@@ -1,5 +1,31 @@
 # Changelog
 
+## Phase 2 — run logging (2026-10-19)
+
+### Added
+- `src/runlog.py`: every `run_agent` call writes `runs/<timestamp>_<id>/` with
+  `meta.json` (model requested and served, prompt, input files with size, sha256,
+  rows and columns, target column, status, timings, git revision), `trace.json`
+  (one entry per API step with latency, tokens, request id and the tool calls it
+  triggered, each with its own latency), `usage.json` (token totals, API versus tool
+  latency, estimated cost with its pricing date) and `report.md`. A failed run is
+  logged too, with its error.
+- `src/pricing.py`: list-price table dated 2026-10-06 and `estimate_cost`; an
+  unknown model is reported as unpriced, never guessed. `PRICING_JSON` overrides.
+- `runs/summarize.py` (`make runs`): one row per run folder, standalone.
+- `runs/example/`: one real run kept as a reference; the rest of `runs/` is ignored.
+- `tests/test_runlog.py`: offline tests with a fake API client covering the loop
+  instrumentation, the folder layout, cost estimation and the summarizer.
+
+### Changed
+- `AgentRun` gains `steps` (per-API-call latency, tokens, cache tokens, request id,
+  stop reason), `run_id`, `started_at`, `finished_at`, `latency_s`, `error` and
+  `log_dir`; `ToolCall` gains `latency_s` and `turn`; `Usage` tracks cache tokens.
+- `run_agent(..., log_dir="runs")`; pass `log_dir=None` to opt out. The eval runner
+  opts out and instead records `steps` and `cost` in each transcript; each eval
+  summary carries an estimated agent cost.
+
+
 ## Phase 1 — agent eval harness and regression suite (2026-10-18)
 
 Rebuilt from the 2026-10-15 design note after the original implementation was lost

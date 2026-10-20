@@ -32,6 +32,7 @@ from evals.checks.judge import DEFAULT_JUDGE_MODEL, RUBRIC_HASH, judge_report
 from evals.checks.numeric_faithfulness import check_numeric_faithfulness
 from evals.checks.tool_sequence import check_tool_sequence
 from evals.checks.verdict import check_verdict
+from runlog import run_to_dict  # noqa: E402
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 AGENT_CONTEXT = SYSTEM_PROMPT + "\n\nTool descriptions:\n" + "\n".join(
@@ -75,7 +76,7 @@ def score_one(
     exc: BaseException | None = None
     try:
         prompt = case.prompt(real=copy.real_path, synth=copy.synth_path)
-        run = run_agent(prompt, model=model)
+        run = run_agent(prompt, model=model, log_dir=None)  # the transcript below is the log
     except Exception as e:  # noqa: BLE001
         exc = e
     latency = time.perf_counter() - started
@@ -113,11 +114,14 @@ def score_one(
             "stop_reason": run.stop_reason,
             "prompt": run.user_prompt,
             "tool_calls": [
-                {"name": tc.name, "input": tc.input, "result": tc.result, "is_error": tc.is_error}
+                {"name": tc.name, "input": tc.input, "result": tc.result, "is_error": tc.is_error,
+                 "latency_s": tc.latency_s, "turn": tc.turn}
                 for tc in run.tool_calls
             ],
+            "steps": [asdict(s) for s in run.steps],
             "report": run.text,
             "usage": asdict(run.usage),
+            "cost": run_to_dict(run)["cost"],
             "checks": {k: v.to_dict() for k, v in checks.items()},
         }
     )
@@ -186,6 +190,10 @@ def summarise(records: list[dict[str, Any]], *, model: str, judge_model: str | N
         "verdict": {"passed": vd_pass, "n": n, "rate": vd_pass / n if n else None},
         "all_three_checks": {"passed": all3, "n": n, "rate": all3 / n if n else None},
         "clarity": {"mean": clarity, "n_judged": len(judged)},
+        "estimated_cost_usd": {
+            "agent": round(sum(r.get("cost", {}).get("total_usd", 0.0) for r in records), 4),
+            "priced": all(r.get("cost", {}).get("priced", False) for r in scored) if scored else False,
+        },
         "agent_tokens": {
             "input": sum(r["usage"]["input_tokens"] for r in records if "usage" in r),
             "output": sum(r["usage"]["output_tokens"] for r in records if "usage" in r),
