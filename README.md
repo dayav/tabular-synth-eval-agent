@@ -100,7 +100,7 @@ runs/20261019_001530_3f9a1c/
 make runs                 # one row per run: model, latency, tokens, estimated cost, verdict
 ```
 
-Pass `log_dir=None` to `run_agent` to skip logging. Cost is an estimate from list prices in `src/pricing.py`, dated in every `usage.json`; a model missing from the table is reported as unpriced rather than guessed. One real run is committed under [runs/example/](runs/example/).
+The design, with figures and references, is in [notes/run_logging.md](notes/run_logging.md); the code walkthrough is [notes/run_logging_code_walkthrough.md](notes/run_logging_code_walkthrough.md). Pass `log_dir=None` to `run_agent` to skip logging. Cost is an estimate from list prices in `src/pricing.py`, dated in every `usage.json`; a model missing from the table is reported as unpriced rather than guessed. One real run is committed under [runs/example/](runs/example/).
 
 ## Evaluating the agent
 

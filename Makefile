@@ -37,6 +37,7 @@ fixtures:
 
 figures:
 	$(PY) notes/figures/make_figures.py
+	$(PY) notes/figures/make_runlog_figures.py
 
 typecheck:
 	$(PY) -m mypy

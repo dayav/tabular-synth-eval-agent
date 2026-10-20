@@ -16,6 +16,9 @@
 - `runs/example/`: one real run kept as a reference; the rest of `runs/` is ignored.
 - `tests/test_runlog.py`: offline tests with a fake API client covering the loop
   instrumentation, the folder layout, cost estimation and the summarizer.
+- `notes/run_logging.md` (design, figures, references) and
+  `notes/run_logging_code_walkthrough.md` (file-by-file); figures from
+  `notes/figures/make_runlog_figures.py`, drawn from `runs/example`.
 
 ### Changed
 - `AgentRun` gains `steps` (per-API-call latency, tokens, cache tokens, request id,
