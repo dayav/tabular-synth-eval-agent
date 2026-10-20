@@ -1,5 +1,37 @@
 # Changelog
 
+## Phase 3 — API, container, CI and deployment path (2026-10-20)
+
+### Added
+- `src/api.py`: FastAPI service. `POST /evaluate` (two CSV uploads + target column,
+  optional model from an allowlist) validates the inputs (CSV only, size and row limits,
+  identical column sets, target with two or more classes), saves them under neutral names,
+  runs the agent with run logging on, and returns run id, parsed verdict, flagged columns,
+  usage, estimated cost and report. `GET /runs`, `GET /runs/{id}` (`?include_trace=true`)
+  read the run folders; `GET /health` reports version, models and whether a key is set.
+  Concurrency is capped (503 when busy); upstream API errors map to 502/503.
+- `Dockerfile` (multi-stage, `python:3.12-slim` + `libgomp1`, non-root, `HEALTHCHECK`),
+  `.dockerignore`, `requirements.lock` (exact versions, `make lock` to refresh).
+- `.github/workflows/ci.yml`: `test` (ruff, mypy, unit, regression, API tests) on every PR
+  and push; `evals` on `main` with Haiku and one run per case, or on manual trigger with a
+  chosen model; `docker` builds, pushes to GHCR and smoke-tests the image; `deploy` rolls
+  an Azure Container App via OIDC when `vars.AZURE_DEPLOY` is `true`.
+- `docs/deploy.md`: local container run, what CI does, the exact `az` commands for the
+  Container Apps demo, optional Azure Files persistence for run logs, OIDC setup, the
+  secrets and variables GitHub needs, tear-down, and the honest status.
+- `tests/test_api.py` (real app, real loop, fake model) and `tests/fake_client.py`
+  (shared scripted client, now also used by the run-logging tests).
+- `make api`, `make docker-build`, `make docker-run`, `make lock`.
+
+### Changed
+- `pyproject.toml`: version 0.3.0; `fastapi`, `uvicorn`, `python-multipart`, `pydantic`
+  are runtime dependencies; `httpx` joins the dev extra for the test client.
+
+### Not done
+- The Azure resources are not created (no `az` login in the build environment). The
+  README says so and claims no URL.
+
+
 ## Phase 2 — run logging (2026-10-19)
 
 ### Added

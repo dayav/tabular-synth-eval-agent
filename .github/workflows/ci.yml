@@ -1,0 +1,137 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "agent model for the eval run"
+        default: "claude-sonnet-5-5"
+        required: true
+      runs:
+        description: "runs per golden case"
+        default: "3"
+        required: true
+      judge:
+        description: "judge model"
+        default: "claude-opus-5-5"
+        required: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # Gate on every PR and push: lint, types, unit tests, regression suite, API tests. No API key needed.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.lock && pip install -e ".[dev]"
+      - run: python -m ruff check src evals regression tests runs notes
+      - run: python -m mypy
+      - run: python -m pytest -q
+      - name: regression suite timing (should stay seconds, not minutes)
+        run: time python -m pytest regression -q
+
+  # Live evals: cheap model on every push to main (cost guard), any model on manual trigger.
+  evals:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.lock && pip install -e ".[dev]"
+      - name: run evals
+        if: env.ANTHROPIC_API_KEY != ''
+        run: |
+          MODEL="${{ github.event.inputs.model || 'claude-haiku-5-5' }}"
+          RUNS="${{ github.event.inputs.runs || '1' }}"
+          JUDGE="${{ github.event.inputs.judge || 'claude-opus-5-5' }}"
+          python -m evals.run_eval --model "$MODEL" --runs "$RUNS" --judge "$JUDGE"
+          python -m evals.compare | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: skipped (no ANTHROPIC_API_KEY secret)
+        if: env.ANTHROPIC_API_KEY == ''
+        run: echo "::warning::ANTHROPIC_API_KEY is not set; eval job skipped"
+      - uses: actions/upload-artifact@v4
+        if: env.ANTHROPIC_API_KEY != ''
+        with:
+          name: eval-results
+          path: evals/results/
+          retention-days: 30
+
+  # Build the image on every push to main and publish it to GHCR, tagged with the commit SHA and latest.
+  docker:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ env.IMAGE }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            APP_VERSION=0.3.0+${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: smoke test the pushed image
+        run: |
+          docker run -d --name smoke -p 8000:8000 -e ANTHROPIC_API_KEY=unused ${{ env.IMAGE }}:${{ github.sha }}
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8000/health && break || sleep 2; done
+          docker logs smoke; docker rm -f smoke
+
+  # Public demo deployment on Azure Container Apps. Opt in with the repository variable AZURE_DEPLOY=true
+  # and the OIDC secrets described in docs/deploy.md; without them this job is skipped.
+  deploy:
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AZURE_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment: demo
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: roll the container app to the new image
+        run: |
+          az containerapp secret set \
+            --name "${{ vars.AZURE_CONTAINERAPP }}" --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --secrets anthropic-api-key="${{ secrets.ANTHROPIC_API_KEY }}"
+          az containerapp update \
+            --name "${{ vars.AZURE_CONTAINERAPP }}" --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "${{ needs.docker.outputs.image }}" \
+            --set-env-vars ANTHROPIC_API_KEY=secretref:anthropic-api-key RUNS_DIR=/data/runs
+          FQDN=$(az containerapp show --name "${{ vars.AZURE_CONTAINERAPP }}" --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 30); do curl -fsS "https://$FQDN/health" && break || sleep 5; done
+          echo "deployed https://$FQDN" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any
 
 import pandas as pd
 import pytest
@@ -20,48 +18,12 @@ from pricing import PRICING_DATE, estimate_cost  # noqa: E402
 from runlog import describe_csv, run_to_dict, write_run  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "runs"))
+sys.path.insert(0, str(ROOT / "tests"))
 import summarize  # noqa: E402
-
-
-# --------------------------------------------------------------------------- fake API
-class _Usage(SimpleNamespace):
-    pass
-
-
-def _response(blocks: list[Any], stop_reason: str, in_tok: int, out_tok: int, cache_read: int = 0) -> Any:
-    return SimpleNamespace(
-        content=blocks,
-        stop_reason=stop_reason,
-        model="claude-fake-1",
-        usage=_Usage(input_tokens=in_tok, output_tokens=out_tok,
-                     cache_read_input_tokens=cache_read, cache_creation_input_tokens=0),
-        _request_id="req_test",
-    )
-
-
-def _tool_use(name: str, inp: dict[str, Any], id_: str) -> Any:
-    return SimpleNamespace(type="tool_use", name=name, input=inp, id=id_)
-
-
-def _text(t: str) -> Any:
-    return SimpleNamespace(type="text", text=t)
-
-
-class FakeMessages:
-    def __init__(self, responses: list[Any]) -> None:
-        self._responses = list(responses)
-        self.calls: list[dict[str, Any]] = []
-
-    def create(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
-        if not self._responses:
-            raise RuntimeError("boom: fake API exhausted")
-        return self._responses.pop(0)
-
-
-class FakeClient:
-    def __init__(self, responses: list[Any]) -> None:
-        self.messages = FakeMessages(responses)
+from fake_client import FakeClient  # noqa: E402
+from fake_client import response as _response  # noqa: E402
+from fake_client import text as _text  # noqa: E402
+from fake_client import tool_use as _tool_use  # noqa: E402
 
 
 @pytest.fixture

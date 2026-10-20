@@ -22,8 +22,8 @@ You give the agent the path to a real dataset and the path to a synthetic versio
 ## Installation
 
 ```bash
-pip install -r requirements.txt          # the agent
-pip install -e ".[dev]"                  # plus pytest, ruff, mypy, matplotlib for the harness and figures
+pip install -r requirements.txt          # the agent and the API
+pip install -e ".[dev]"                  # plus pytest, ruff, mypy, matplotlib, httpx for the harness, figures and API tests
 ```
 
 The agent calls the Anthropic API, so it needs an API key. Copy the example file and fill in your key:
@@ -102,6 +102,31 @@ make runs                 # one row per run: model, latency, tokens, estimated c
 
 The design, with figures and references, is in [notes/run_logging.md](notes/run_logging.md); the code walkthrough is [notes/run_logging_code_walkthrough.md](notes/run_logging_code_walkthrough.md). Pass `log_dir=None` to `run_agent` to skip logging. Cost is an estimate from list prices in `src/pricing.py`, dated in every `usage.json`; a model missing from the table is reported as unpriced rather than guessed. One real run is committed under [runs/example/](runs/example/).
 
+## HTTP service and container
+
+The agent is also served as a small FastAPI app ([src/api.py](src/api.py)):
+
+| route | what |
+|---|---|
+| `POST /evaluate` | multipart upload of a real and a synthetic CSV plus `target_column` (and optional `model`); runs the agent and returns the run id, parsed verdict, flagged columns, usage, estimated cost and the report |
+| `GET /runs` | recent runs from the run log |
+| `GET /runs/{id}` | one run's meta, usage and report; `?include_trace=true` adds the step-by-step trace |
+| `GET /health` | liveness plus the configuration that matters (default model, allowed models, whether a key is configured, upload limits) |
+
+Uploads are validated before the model is called: CSV only, size and row limits, identical column sets, target present with at least two classes. Files are saved under neutral names so an upload's file name cannot hint the model. Concurrent evaluations are capped (default 2; a 503 says so). The API key is read from the environment only.
+
+```bash
+make api                                                # dev server on :8000, interactive docs at /docs
+curl -s -F real=@examples/real_sample.csv -F synthetic=@examples/synth_sample.csv \
+     -F target_column=target localhost:8000/evaluate | python -m json.tool
+
+make docker-build && make docker-run                    # same service in the container, runs/ mounted
+```
+
+The multi-stage [Dockerfile](Dockerfile) installs the pinned [requirements.lock](requirements.lock) in a builder stage and ships a slim, non-root runtime with a health check. [CI](.github/workflows/ci.yml) runs lint, types, unit tests, the regression suite and the API tests on every PR; on `main` it also runs a cheap live eval (Haiku, one run per case), builds and publishes the image to GHCR, and, if the Azure variables are set, rolls the public demo deployment. The exact Azure setup is in [docs/deploy.md](docs/deploy.md).
+
+**Deployment status:** the image builds and serves locally; the Azure Container Apps demo is documented and wired into CI but **not yet live**. When it is, the URL goes here and nowhere else, labelled "public demo deployment".
+
 ## Evaluating the agent
 
 An agent that grades data but is never itself graded is not much of a tool, so the repository ships an evaluation harness for the agent and a regression suite that runs on every commit. The design is explained from first principles, with figures and references, in [notes/eval_harness.md](notes/eval_harness.md).
@@ -134,23 +159,27 @@ src/
   agent.py       # Agent loop: sends the prompt to Claude, dispatches tool calls, returns an AgentRun
   tools.py       # The three evaluation tools (JS distance, Cohen's d, TSTR/XGBoost)
   report.py      # Writes the agent's assessment to a Markdown report
+  api.py         # FastAPI service: POST /evaluate, GET /runs, GET /runs/{id}, GET /health
+  runlog.py      # Per-run folder writer; pricing.py holds the dated list prices
 evals/           # Golden cases, checkers, LLM judge, eval runner (make eval)
 runs/            # Per-run logs: trace, latency, tokens, cost (make runs); one example committed
 regression/      # Deterministic pytest suite replaying recorded failures (make regression)
 tests/           # Known-answer unit tests for the tools
 examples/        # Sample real and synthetic CSVs
-notes/           # Scope, the eval-harness note and its generated figures
+notes/           # Scope, the eval-harness and run-logging notes, generated figures
+docs/deploy.md   # Container and Azure Container Apps setup
+Dockerfile, requirements.lock, .github/workflows/ci.yml
 CHANGELOG.md
 Makefile
 ```
 
 ## Roadmap
 
-v2, in order (phases 1 and 2 are done):
+v2, in order (phases 1 to 3 are done, bar the live Azure step):
 
 1. ~~Agent eval harness and regression suite~~
 2. ~~Run logging: per-run folder with trace, latency, tokens, cost~~
-3. FastAPI service, Dockerfile, CI with the regression suite as a gate, a public demo deployment
+3. ~~FastAPI service, Dockerfile, CI with the regression suite as a gate~~; the Azure demo deployment is documented and wired, not yet live
 4. Privacy tool (HEOM-based identifiability, from the thesis pipeline)
 5. Retrieval over metric documentation so thresholds come from the docs
 6. An LLM tabular-generation baseline evaluated by the same agent
