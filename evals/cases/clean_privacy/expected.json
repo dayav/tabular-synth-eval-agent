@@ -1,0 +1,22 @@
+{
+  "description": "A fresh draw from the same process, with the prompt asking about privacy: the privacy control.",
+  "construction": "synth = draw_population(rng)  # same process, different random draw",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost",
+    "identifiability_heom"
+  ],
+  "verdict": {
+    "categorical": "good",
+    "numerical": "good",
+    "utility": "good",
+    "privacy": "good",
+    "overall": "excellent"
+  },
+  "flagged_columns": [],
+  "notes": "An honest sample: identifiability near 0.5 (under the 0.7 threshold), no exact matches. epsilon_any is around 0.65 and must not be read as a problem: its honest-sample level is high.",
+  "ask_privacy": true
+}

@@ -168,3 +168,13 @@ def test_upstream_failure_is_502(client: TestClient, monkeypatch: pytest.MonkeyP
     real, synth = _frames()
     r = client.post("/evaluate", files=_files(real, synth), data={"target_column": "target"})
     assert r.status_code == 502 and "upstream" in r.json()["detail"]
+
+
+def test_assess_privacy_flag_changes_the_prompt(client: TestClient) -> None:
+    real, synth = _frames()
+    r = client.post("/evaluate", files=_files(real, synth), data={"target_column": "target", "assess_privacy": "true"})
+    assert r.status_code == 200, r.text
+    detail = client.get(f"/runs/{r.json()['run_id']}").json()
+    assert "privacy" in detail["meta"]["prompt"] and "disclosure risk" in detail["meta"]["prompt"]
+    r2 = client.post("/evaluate", files=_files(real, synth), data={"target_column": "target"})
+    assert "privacy" not in client.get(f"/runs/{r2.json()['run_id']}").json()["meta"]["prompt"]

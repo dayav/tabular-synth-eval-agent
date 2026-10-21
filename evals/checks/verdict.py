@@ -21,8 +21,10 @@ FENCED_BLOCK = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 JS_THRESHOLD = 0.1
 COHEN_D_THRESHOLD = 0.2
 UTILITY_GAP_THRESHOLD = 0.05
+IDENTIFIABILITY_THRESHOLD = 0.7
+EXACT_MATCH_THRESHOLD = 0.05
 
-AXES = ("categorical", "numerical", "utility", "overall")
+AXES = ("categorical", "numerical", "utility", "privacy", "overall")
 
 
 def _candidates(text: str) -> list[tuple[int, int, dict[str, Any]]]:
@@ -80,33 +82,42 @@ def derive_expected(
     d_result: dict[str, Any],
     tstr_result: dict[str, Any],
     target_column: str,
+    privacy_result: dict[str, Any] | None = None,
     *,
     js_threshold: float = JS_THRESHOLD,
     d_threshold: float = COHEN_D_THRESHOLD,
     gap_threshold: float = UTILITY_GAP_THRESHOLD,
+    identifiability_threshold: float = IDENTIFIABILITY_THRESHOLD,
+    exact_match_threshold: float = EXACT_MATCH_THRESHOLD,
 ) -> dict[str, Any]:
-    """Apply the prompt's verdict rules to raw tool output."""
+    """Apply the prompt's verdict rules to raw tool output.
+
+    The privacy axis is present only when ``privacy_result`` is given, mirroring the
+    prompt: privacy is assessed only when asked for.
+    """
     cat_flags = _flags(js_result["per_column"], js_threshold, target_column)
     num_flags = _flags(d_result["per_column"], d_threshold, target_column)
     gap = float(tstr_result["utility_gap"])
     categorical = "poor" if cat_flags else "good"
     numerical = "poor" if num_flags else "good"
     utility = "poor" if gap > gap_threshold else "good"
-    if utility == "poor":
+    verdict: dict[str, str] = {"categorical": categorical, "numerical": numerical, "utility": utility}
+    privacy: str | None = None
+    if privacy_result is not None:
+        crossed = (
+            float(privacy_result["identifiability"]) > identifiability_threshold
+            or float(privacy_result["exact_match_fraction"]) > exact_match_threshold
+        )
+        privacy = "poor" if crossed else "good"
+        verdict["privacy"] = privacy
+    if utility == "poor" or privacy == "poor":
         overall = "poor"
     elif categorical == "good" and numerical == "good":
         overall = "excellent"
     else:
         overall = "acceptable"
-    return {
-        "verdict": {
-            "categorical": categorical,
-            "numerical": numerical,
-            "utility": utility,
-            "overall": overall,
-        },
-        "flagged_columns": sorted(cat_flags + num_flags),
-    }
+    verdict["overall"] = overall
+    return {"verdict": verdict, "flagged_columns": sorted(cat_flags + num_flags)}
 
 
 def _mentioned_in_prose(column: str, prose: str) -> bool:
@@ -123,6 +134,10 @@ def check_verdict(report: str, expected: dict[str, Any]) -> CheckResult:
         )
     got_verdict = block.get("verdict") or {}
     for axis in AXES:
+        if axis not in expected["verdict"]:
+            if axis in got_verdict:
+                problems.append(f"{axis}: assessed although it was not asked for (got {got_verdict[axis]!r})")
+            continue
         if got_verdict.get(axis) != expected["verdict"][axis]:
             problems.append(f"{axis}: got {got_verdict.get(axis)!r}, expected {expected['verdict'][axis]!r}")
     got_flags = set(block.get("flagged_columns") or [])

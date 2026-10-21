@@ -1,5 +1,42 @@
 # Changelog
 
+## Phase 4 — privacy tool (2026-10-21)
+
+### Added
+- `identifiability_heom` in `src/tools.py`, ported from the thesis pipeline
+  (`privacy_sampling/heom.py`, `get_epsilon_heom_any`): HEOM encoding (numerics min-max
+  scaled on the real data, categoricals one-hot scaled by 1/√2 so a mismatch counts 1),
+  then nearest neighbours. Returns `identifiability` (fraction of real records whose
+  nearest synthetic record is closer than their nearest other real record, on a
+  size-matched synthetic subsample; honest sample ≈ 0.5, copy = 1.0), the thesis
+  `epsilon_any` (fraction of synthetic rows inside some real record's k-NN ball),
+  `exact_matches` / `exact_match_fraction`, median distances, the column split and the
+  rows dropped for missing values. `k` and `exclude_columns` are parameters.
+- Agent: fourth tool in `TOOLS` and `TOOL_REGISTRY`; the system prompt calls it only when
+  the request asks about privacy, states the thresholds (identifiability > 0.7 or exact
+  matches > 5% is poor; `epsilon_any` is never thresholded), adds a `privacy` key to the
+  verdict block when assessed, and makes overall poor when utility or privacy is poor.
+- Golden cases `identical_privacy` (copy, must be poor overall) and `clean_privacy`
+  (honest control, must stay excellent); cases carry `ask_privacy` and the prompt gains a
+  privacy sentence. `derive_expected` takes the privacy result; `check_verdict` fails a
+  privacy axis that was not asked for and a missing one that was.
+- Regression: oracle report with a privacy section; tests for the privacy axis matching
+  the request and for the privacy tool being unexpected when not asked.
+- Unit tests for the tool: exact copy maximal, honest sample near 0.5, far sample zero,
+  HEOM distance units, `k`, `exclude_columns`, missing values, size-matched subsample.
+- API: `assess_privacy` form field on `POST /evaluate`; `Verdict.privacy`.
+
+### Measured (design calibration, 2026-10-21, 2000-row golden data)
+- identifiability: copy 1.00, honest re-draw 0.49, copy + 0.2 sd jitter 0.83,
+  copy + 0.1 sd jitter 0.96, 50% rows copied 0.66 (caught by exact matches 0.50).
+- epsilon_any on the honest re-draw is 0.67: the ANY rule's honest level is high, which
+  is why the agent is told not to threshold it.
+- Live check (2026-10-21, `identical_privacy`, `clean_privacy`, `clean_synthetic`, two runs
+  each, Opus judge): claude-haiku-5-5 and claude-sonnet-5-5 both 12/12 on all three
+  checks. Both called the privacy tool exactly when asked and never otherwise, called the
+  copy poor overall, and kept the honest control excellent. Clarity 4.50 and 4.67.
+
+
 ## Phase 3 — API, container, CI and deployment path (2026-10-20)
 
 ### Added

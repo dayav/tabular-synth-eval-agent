@@ -26,8 +26,10 @@ from report import save_report
 from runlog import DEFAULT_RUNS_DIR, write_run
 from tools import (
     FidelityResult,
+    PrivacyResult,
     UtilityResult,
     cohen_d_numerical,
+    identifiability_heom,
     js_divergence_categorical,
     tstr_xgboost,
 )
@@ -40,6 +42,8 @@ DEFAULT_MAX_TOKENS: int = 16000
 JS_THRESHOLD: float = 0.1
 COHEN_D_THRESHOLD: float = 0.2
 UTILITY_GAP_THRESHOLD: float = 0.05
+IDENTIFIABILITY_THRESHOLD: float = 0.7
+EXACT_MATCH_THRESHOLD: float = 0.05
 
 _client: Anthropic | None = None
 
@@ -62,27 +66,37 @@ def get_client() -> Anthropic:
 
 SYSTEM_PROMPT: str = f"""You are an expert in evaluating synthetic tabular data.
 
-You have three tools available:
+You have four tools available:
 - js_divergence_categorical: fidelity of categorical columns (Jensen-Shannon distance)
 - cohen_d_numerical: fidelity of numerical columns (Cohen's d)
 - tstr_xgboost: predictive utility (train-on-synthetic vs train-on-real)
+- identifiability_heom: privacy (disclosure risk): nearest-neighbour identifiability in HEOM space
 
-When asked to evaluate a synthetic dataset, call each of the three tools exactly once,
-with the real and synthetic paths you were given and, for tstr_xgboost, the target column
-you were given. Then write a short plain-English report.
+When asked to evaluate a synthetic dataset, call js_divergence_categorical, cohen_d_numerical
+and tstr_xgboost exactly once each, with the real and synthetic paths you were given and, for
+tstr_xgboost, the target column you were given. Call identifiability_heom exactly once, in
+addition, only when the request asks about privacy, disclosure risk, re-identification,
+memorisation or copying; do not call it otherwise. Then write a short plain-English report.
 
 Thresholds (the only thresholds you may use):
 - A categorical column is flagged when its JS distance is above {JS_THRESHOLD}.
 - A numerical column is flagged when its Cohen's d is above {COHEN_D_THRESHOLD}.
 - Utility is poor when the utility gap (TRTR accuracy minus TSTR accuracy) is above
   {UTILITY_GAP_THRESHOLD}. A gap at or below 0 is good: the synthetic data lost no utility.
+- Privacy is poor when identifiability is above {IDENTIFIABILITY_THRESHOLD} (an honest sample
+  of the same size as the real data sits near 0.5; a copy scores 1.0), or when
+  exact_match_fraction is above {EXACT_MATCH_THRESHOLD} (verbatim real rows in the synthetic
+  data). epsilon_any is supporting evidence only: its level for an honest sample is high and
+  data-dependent, so never apply a threshold to it.
 
 Verdict rules (apply them mechanically):
 - categorical fidelity is "poor" if any categorical column is flagged, otherwise "good".
 - numerical fidelity is "poor" if any numerical column is flagged, otherwise "good".
 - utility is "poor" if the gap is above its threshold, otherwise "good".
-- overall is "excellent" when all three axes are good, "poor" when utility is poor, and
-  "acceptable" when utility is good but at least one fidelity axis is poor.
+- privacy, only when it was assessed, is "poor" if either privacy threshold is crossed,
+  otherwise "good".
+- overall is "poor" when utility is poor or privacy is poor; otherwise "excellent" when
+  every assessed axis is good, and "acceptable" when at least one fidelity axis is poor.
 
 Rules for the report:
 - You are a reporter, not a calculator. Quote numbers exactly as the tools returned them
@@ -99,11 +113,12 @@ Rules for the report:
   can follow. Mention the caveats that matter (a negative gap, a small test set, a utility
   problem whose cause is not visible). Be honest: if the data is poor on any axis, say so.
 
-End the report with exactly one fenced JSON block of this form, and nothing after it:
+End the report with exactly one fenced JSON block of this form, and nothing after it.
+Include the "privacy" key only when privacy was assessed:
 
 ```json
 {{"verdict": {{"categorical": "good|poor", "numerical": "good|poor", "utility": "good|poor",
-             "overall": "excellent|acceptable|poor"}},
+             "privacy": "good|poor", "overall": "excellent|acceptable|poor"}},
  "flagged_columns": ["column", "..."]}}
 ```
 """
@@ -193,12 +208,51 @@ TOOLS: list[ToolParam] = [
             "required": ["real_csv_path", "synth_csv_path", "target_column"],
         },
     },
+    {
+        "name": "identifiability_heom",
+        "description": (
+            "Privacy / disclosure-risk evaluation. Encodes both datasets in HEOM space (numeric "
+            "columns min-max scaled on the real data, categorical columns one-hot so that a category "
+            "mismatch counts 1) and uses nearest neighbours. Returns: identifiability (fraction of "
+            "real records whose nearest synthetic record is closer than their nearest other real "
+            "record; about 0.5 for an honest sample of the same size, 1.0 for a copy; higher is "
+            "worse), epsilon_any (fraction of synthetic rows inside at least one real record's "
+            "k-nearest-neighbour ball, the thesis filter statistic; lower is better, honest level "
+            "is high and data-dependent), exact_matches and exact_match_fraction (verbatim real rows "
+            "in the synthetic data), median distances, k, the column split and the number of rows "
+            "dropped for missing values."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "real_csv_path": {
+                    "type": "string",
+                    "description": "Filesystem path to the real dataset CSV.",
+                },
+                "synth_csv_path": {
+                    "type": "string",
+                    "description": "Filesystem path to the synthetic dataset CSV.",
+                },
+                "k": {
+                    "type": "integer",
+                    "description": "Neighbour rank defining each real record's radius (default 2).",
+                },
+                "exclude_columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Columns to leave out of the distance (identifiers, free text).",
+                },
+            },
+            "required": ["real_csv_path", "synth_csv_path"],
+        },
+    },
 ]
 
-TOOL_REGISTRY: dict[str, Callable[..., FidelityResult | UtilityResult]] = {
+TOOL_REGISTRY: dict[str, Callable[..., FidelityResult | UtilityResult | PrivacyResult]] = {
     "js_divergence_categorical": js_divergence_categorical,
     "cohen_d_numerical": cohen_d_numerical,
     "tstr_xgboost": tstr_xgboost,
+    "identifiability_heom": identifiability_heom,
 }
 
 

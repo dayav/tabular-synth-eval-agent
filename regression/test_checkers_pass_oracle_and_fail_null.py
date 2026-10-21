@@ -19,13 +19,13 @@ from evals.checks.verdict import check_verdict
 from regression.helpers import TOOL_NAMES, fake_tool_calls, oracle_report, prompts_for
 
 
-@pytest.mark.parametrize("name", ["identical", "clean_synthetic", "income_shuffled", "score_leaks_target", "age_x10", "phd_missing"])
+@pytest.mark.parametrize("name", ["identical", "clean_synthetic", "income_shuffled", "score_leaks_target", "age_x10", "phd_missing", "identical_privacy", "clean_privacy"])
 def test_oracle_passes_all_three_checks(name: str, cases: list[Case], tool_outputs: dict[str, dict[str, Any]]) -> None:
     case = next(c for c in cases if c.name == name)
     out = tool_outputs[name]
     calls = fake_tool_calls(case, out)
     report = oracle_report(case, out)
-    seq = check_tool_sequence(calls, TOOL_NAMES, case.real_path, case.synth_path, case.target_column)
+    seq = check_tool_sequence(calls, case.expected_tools, case.real_path, case.synth_path, case.target_column)
     num = check_numeric_faithfulness(report, [tc.result for tc in calls], *prompts_for(case))
     ver = check_verdict(report, case.expected)
     assert seq.passed, seq.details
@@ -59,3 +59,28 @@ def test_missing_duplicated_and_mistargeted_calls_fail(cases: list[Case], tool_o
 
     errored = calls[:2] + [ToolCall("tstr_xgboost", calls[2].input, {"error": "KeyError: 'target'"}, is_error=True)]
     assert not check_tool_sequence(errored, *args).passed
+
+    # the privacy tool is "unexpected" when the prompt did not ask for privacy
+    unasked = calls + [ToolCall("identifiability_heom", dict(calls[0].input), tool_outputs["clean_privacy"]["privacy"])]
+    assert not check_tool_sequence(unasked, *args).passed
+
+
+def test_privacy_axis_must_match_the_request(cases: list[Case], tool_outputs: dict[str, dict[str, Any]]) -> None:
+    """A privacy verdict on a case that did not ask for privacy fails; a missing one on a case that did fails."""
+    import json
+
+    from evals.checks.verdict import check_verdict
+
+    plain = next(c for c in cases if c.name == "clean_synthetic")
+    report = oracle_report(plain, tool_outputs[plain.name])
+    with_privacy = report.replace('"utility": "good"', '"utility": "good", "privacy": "good"')
+    assert check_verdict(report, plain.expected).passed
+    assert not check_verdict(with_privacy, plain.expected).passed
+
+    asked = next(c for c in cases if c.name == "identical_privacy")
+    report = oracle_report(asked, tool_outputs[asked.name])
+    assert check_verdict(report, asked.expected).passed
+    block = json.dumps({"verdict": {"categorical": "good", "numerical": "good", "utility": "good", "overall": "excellent"}, "flagged_columns": []})
+    without = report[: report.rfind("```json")] + "```json\n" + block + "\n```"
+    check = check_verdict(without, asked.expected)
+    assert not check.passed and any(p.startswith("privacy:") for p in check.details["problems"])

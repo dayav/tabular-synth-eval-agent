@@ -50,6 +50,7 @@ PROMPT_TEMPLATE = (
     "Evaluate the synthetic dataset at {synth} against the real dataset at {real}. "
     "The target column for utility evaluation is '{target}'."
 )
+PRIVACY_SUFFIX = " Also assess the privacy of the synthetic data: the disclosure risk of real records."
 
 def _version() -> str:
     """APP_VERSION if set (the container sets it at build time), else the installed package's version."""
@@ -71,6 +72,7 @@ class Verdict(BaseModel):
     categorical: str | None = None
     numerical: str | None = None
     utility: str | None = None
+    privacy: str | None = Field(default=None, description="present only when privacy was assessed")
     overall: str | None = None
 
 
@@ -152,7 +154,7 @@ def parse_verdict(report: str) -> tuple[Verdict | None, list[str]]:
         return None, []
     v = found.get("verdict") or {}
     flagged = [str(c) for c in (found.get("flagged_columns") or [])]
-    return Verdict(**{k: v.get(k) for k in ("categorical", "numerical", "utility", "overall")}), flagged
+    return Verdict(**{k: v.get(k) for k in ("categorical", "numerical", "utility", "privacy", "overall")}), flagged
 
 
 def _read_limited(upload: UploadFile, limit: int) -> bytes:
@@ -292,6 +294,7 @@ def evaluate(
     synthetic: Annotated[UploadFile, File(description="the synthetic dataset, CSV, same columns")],
     target_column: Annotated[str, Form(min_length=1, max_length=200, description="classification target present in both files")],
     model: Annotated[str | None, Form(description="one of the allowed models (see /health); default is the service's default")] = None,
+    assess_privacy: Annotated[bool, Form(description="also run the HEOM identifiability (disclosure risk) tool")] = False,
 ) -> EvaluateResponse:
     """Run the agent on one real/synthetic pair. Synchronous: returns when the report is written."""
     chosen = model or API_DEFAULT_MODEL
@@ -309,6 +312,8 @@ def evaluate(
         _validate_pair(real_frame, synth_frame, target_column)
 
         prompt = PROMPT_TEMPLATE.format(real=real_path, synth=synth_path, target=target_column)
+        if assess_privacy:
+            prompt += PRIVACY_SUFFIX
         try:
             run = run_agent(prompt, max_turns=MAX_TURNS, model=chosen, log_dir=RUNS_DIR)
         except anthropic.AuthenticationError as e:

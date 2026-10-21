@@ -8,12 +8,16 @@ It is built on the evaluation methodology from my master's thesis on privacy-pre
 
 ## How it works
 
-You give the agent the path to a real dataset and the path to a synthetic version of it. The agent then calls three evaluation tools and synthesizes the results into a readable summary. It currently covers two dimensions of quality:
+You give the agent the path to a real dataset and the path to a synthetic version of it. The agent then calls three evaluation tools, plus a privacy tool when you ask for it, and synthesizes the results into a readable summary. It covers three dimensions of quality:
 
 ### Univariate fidelity — does each column *look* like the real thing?
 
 - **Categorical columns — Jensen–Shannon distance.** Measures how closely each synthetic categorical column's distribution matches the real one. `0` means identical, larger values mean more divergence (typically `< 0.1` is good).
 - **Numerical columns — Cohen's *d*.** A standardized effect size for the difference in means between the real and synthetic values of each numerical column. Smaller is better (`< 0.2` is a small effect, indicating good fidelity).
+
+### Privacy — does the synthetic data *expose* real records? (on request)
+
+- **HEOM nearest-neighbour identifiability.** Both datasets are encoded in HEOM space (numeric columns min-max scaled on the real data, a category mismatch counting 1). **Identifiability** is the fraction of real records whose nearest synthetic record is closer than their nearest other real record: about `0.5` for an honest sample of the same size, `1.0` for a copy. The tool also reports the thesis filter statistic **εANY** (fraction of synthetic rows inside some real record's 2-NN ball) and the fraction of **exact matches**. The agent calls this tool only when the request asks about privacy or disclosure risk; privacy is poor above `0.7` identifiability or `5%` exact matches, and a poor privacy verdict makes the overall verdict poor.
 
 ### Utility — is the synthetic data *useful* for a downstream model?
 
@@ -108,7 +112,7 @@ The agent is also served as a small FastAPI app ([src/api.py](src/api.py)):
 
 | route | what |
 |---|---|
-| `POST /evaluate` | multipart upload of a real and a synthetic CSV plus `target_column` (and optional `model`); runs the agent and returns the run id, parsed verdict, flagged columns, usage, estimated cost and the report |
+| `POST /evaluate` | multipart upload of a real and a synthetic CSV plus `target_column` (optional `model`, optional `assess_privacy=true`); runs the agent and returns the run id, parsed verdict, flagged columns, usage, estimated cost and the report |
 | `GET /runs` | recent runs from the run log |
 | `GET /runs/{id}` | one run's meta, usage and report; `?include_trace=true` adds the step-by-step trace |
 | `GET /health` | liveness plus the configuration that matters (default model, allowed models, whether a key is configured, upload limits) |
@@ -131,7 +135,7 @@ The multi-stage [Dockerfile](Dockerfile) installs the pinned [requirements.lock]
 
 An agent that grades data but is never itself graded is not much of a tool, so the repository ships an evaluation harness for the agent and a regression suite that runs on every commit. The design is explained from first principles, with figures and references, in [notes/eval_harness.md](notes/eval_harness.md).
 
-In short: six real/synthetic pairs are built so that the right answer is known by construction (an exact copy, a clean re-draw, a shuffled column, a leaked label, a column scaled ×10, a missing category level). `make eval` runs the agent on each of them N times and checks three things mechanically: did it call the right tools, is every number in its report traceable to a tool result or the prompt, and is its verdict right. A second model scores clarity against a fixed rubric. `make regression` replays recorded failures through the checkers in a few seconds, without calling the model.
+In short: eight real/synthetic pairs are built so that the right answer is known by construction (an exact copy, a clean re-draw, a shuffled column, a leaked label, a column scaled ×10, a missing category level, and the copy and the re-draw again with the prompt asking about privacy). `make eval` runs the agent on each of them N times and checks three things mechanically: did it call the right tools, is every number in its report traceable to a tool result or the prompt, and is its verdict right. A second model scores clarity against a fixed rubric. `make regression` replays recorded failures through the checkers in a few seconds, without calling the model.
 
 ```bash
 make test                                   # unit tests for the tools + regression suite, no API key needed
@@ -157,7 +161,7 @@ Read these as measured on six synthetic cases with thresholds given in the promp
 ```
 src/
   agent.py       # Agent loop: sends the prompt to Claude, dispatches tool calls, returns an AgentRun
-  tools.py       # The three evaluation tools (JS distance, Cohen's d, TSTR/XGBoost)
+  tools.py       # The four evaluation tools (JS distance, Cohen's d, TSTR/XGBoost, HEOM identifiability)
   report.py      # Writes the agent's assessment to a Markdown report
   api.py         # FastAPI service: POST /evaluate, GET /runs, GET /runs/{id}, GET /health
   runlog.py      # Per-run folder writer; pricing.py holds the dated list prices
@@ -175,12 +179,12 @@ Makefile
 
 ## Roadmap
 
-v2, in order (phases 1 to 3 are done, bar the live Azure step):
+v2, in order (phases 1 to 4 are done, bar the live Azure step):
 
 1. ~~Agent eval harness and regression suite~~
 2. ~~Run logging: per-run folder with trace, latency, tokens, cost~~
 3. ~~FastAPI service, Dockerfile, CI with the regression suite as a gate~~; the Azure demo deployment is documented and wired, not yet live
-4. Privacy tool (HEOM-based identifiability, from the thesis pipeline)
+4. ~~Privacy tool (HEOM-based identifiability, from the thesis pipeline)~~
 5. Retrieval over metric documentation so thresholds come from the docs
 6. An LLM tabular-generation baseline evaluated by the same agent
 

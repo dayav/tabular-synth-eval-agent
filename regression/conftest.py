@@ -18,7 +18,7 @@ for p in (REPO_ROOT, REPO_ROOT / "src"):
         sys.path.insert(0, str(p))
 
 from evals.cases import Case, load_cases  # noqa: E402
-from tools import cohen_d_numerical, js_divergence_categorical, tstr_xgboost  # noqa: E402
+from tools import cohen_d_numerical, identifiability_heom, js_divergence_categorical, tstr_xgboost  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -37,4 +37,6 @@ def tool_outputs(cases: list[Case]) -> dict[str, dict[str, Any]]:
             "d": cohen_d_numerical(r, s),
             "tstr": tstr_xgboost(r, s, c.target_column),
         }
+        if "identifiability_heom" in c.expected_tools:
+            out[c.name]["privacy"] = identifiability_heom(r, s)
     return out

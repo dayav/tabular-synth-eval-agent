@@ -1,0 +1,22 @@
+{
+  "description": "Exact copy of the real file, with the prompt asking about privacy.",
+  "construction": "synth = real",
+  "ground_truth_source": "known by construction of the synthetic file (see evals/generate_cases.py)",
+  "target_column": "target",
+  "tools": [
+    "js_divergence_categorical",
+    "cohen_d_numerical",
+    "tstr_xgboost",
+    "identifiability_heom"
+  ],
+  "verdict": {
+    "categorical": "good",
+    "numerical": "good",
+    "utility": "good",
+    "privacy": "poor",
+    "overall": "poor"
+  },
+  "flagged_columns": [],
+  "notes": "Every synthetic row is a verbatim real row: identifiability 1.0, exact_match_fraction 1.0. Maximum disclosure risk. Fidelity and utility look perfect, which is exactly why a privacy axis is needed: the report must call this poor overall.",
+  "ask_privacy": true
+}

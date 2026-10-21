@@ -23,6 +23,7 @@ PROMPT_TEMPLATE = (
     "Evaluate the synthetic dataset at {synth} against the real dataset at {real}. "
     "The target column for utility evaluation is '{target}'."
 )
+PRIVACY_SUFFIX = " Also assess the privacy of the synthetic data: the disclosure risk of real records."
 
 
 @dataclass(frozen=True)
@@ -40,12 +41,17 @@ class Case:
     def expected_tools(self) -> list[str]:
         return list(self.expected["tools"])
 
+    @property
+    def ask_privacy(self) -> bool:
+        return bool(self.expected.get("ask_privacy", False))
+
     def prompt(self, real: Path | None = None, synth: Path | None = None) -> str:
-        return PROMPT_TEMPLATE.format(
+        text = PROMPT_TEMPLATE.format(
             real=real or self.real_path,
             synth=synth or self.synth_path,
             target=self.target_column,
         )
+        return text + PRIVACY_SUFFIX if self.ask_privacy else text
 
 
 def load_case(case_dir: Path) -> Case:

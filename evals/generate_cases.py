@@ -34,6 +34,7 @@ N_ROWS = 2000
 SEED = 42
 TARGET = "target"
 TOOLS = ["js_divergence_categorical", "cohen_d_numerical", "tstr_xgboost"]
+TOOLS_WITH_PRIVACY = [*TOOLS, "identifiability_heom"]
 
 
 def _z(x: np.ndarray) -> np.ndarray:
@@ -188,6 +189,39 @@ def main(out_dir: Path = CASES_DIR) -> None:
         ),
     }
     all_cases = {"identical": (real.copy(), identical_expected), **build_cases(rng)}
+
+    # Privacy cases: the same files as two existing cases, with the prompt asking for privacy.
+    # The verdicts gain a privacy axis; overall follows the rule "poor if utility or privacy is poor".
+    all_cases["identical_privacy"] = (
+        real.copy(),
+        {
+            **identical_expected,
+            "description": "Exact copy of the real file, with the prompt asking about privacy.",
+            "ask_privacy": True,
+            "tools": TOOLS_WITH_PRIVACY,
+            "verdict": {"categorical": "good", "numerical": "good", "utility": "good", "privacy": "poor", "overall": "poor"},
+            "notes": (
+                "Every synthetic row is a verbatim real row: identifiability 1.0, exact_match_fraction 1.0. "
+                "Maximum disclosure risk. Fidelity and utility look perfect, which is exactly why a privacy "
+                "axis is needed: the report must call this poor overall."
+            ),
+        },
+    )
+    clean_frame, clean_expected = all_cases["clean_synthetic"]
+    all_cases["clean_privacy"] = (
+        clean_frame,
+        {
+            **clean_expected,
+            "description": "A fresh draw from the same process, with the prompt asking about privacy: the privacy control.",
+            "ask_privacy": True,
+            "tools": TOOLS_WITH_PRIVACY,
+            "verdict": {"categorical": "good", "numerical": "good", "utility": "good", "privacy": "good", "overall": "excellent"},
+            "notes": (
+                "An honest sample: identifiability near 0.5 (under the 0.7 threshold), no exact matches. "
+                "epsilon_any is around 0.65 and must not be read as a problem: its honest-sample level is high."
+            ),
+        },
+    )
 
     for name, (synth, exp) in all_cases.items():
         case_dir = out_dir / name
