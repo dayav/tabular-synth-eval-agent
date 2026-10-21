@@ -24,6 +24,9 @@
 - `tests/test_generate.py` (schema summary, strict JSON schema, row validation, batching
   with a scripted client, attempt budget) and `tests/test_compare_generators.py`.
 - `make fetch-generators`, `make compare-generators`; `tables` in the dev extra.
+- `notes/llm_generation_baseline.md` (design, measured figures, references) and
+  `notes/llm_generation_baseline_code_walkthrough.md` (file-by-file); figures drawn from
+  `results/generators/comparison.json` by `notes/figures/make_generation_figures.py`.
 
 ### Gotchas
 - Structured output accepts no `minItems`/`maxItems` beyond 0/1 on arrays; the batch size

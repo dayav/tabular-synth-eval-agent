@@ -42,6 +42,7 @@ figures:
 	$(PY) notes/figures/make_runlog_figures.py
 	$(PY) notes/figures/make_service_figures.py
 	$(PY) notes/figures/make_privacy_figures.py
+	$(PY) notes/figures/make_generation_figures.py
 
 typecheck:
 	$(PY) -m mypy

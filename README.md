@@ -112,7 +112,7 @@ The design, with figures and references, is in [notes/run_logging.md](notes/run_
 
 ## LLM generation baseline
 
-A `generate_with_llm` tool ([src/generate.py](src/generate.py)) asks Claude for rows as strict JSON from a dataset's column schema and marginal statistics only, validates every row and writes a CSV. It is a baseline next to the thesis pipeline's CTGAN and TVAE outputs, scored by the same four tools and judged by the same agent; it is deliberately not one of the evaluation agent's tools, because an evaluator must not generate what it grades.
+A `generate_with_llm` tool ([src/generate.py](src/generate.py)) asks Claude for rows as strict JSON from a dataset's column schema and marginal statistics only, validates every row and writes a CSV. It is a baseline next to the thesis pipeline's CTGAN and TVAE outputs, scored by the same four tools and judged by the same agent; it is deliberately not one of the evaluation agent's tools, because an evaluator must not generate what it grades. The design, the measured comparison with figures, and references are in [notes/llm_generation_baseline.md](notes/llm_generation_baseline.md); the code walkthrough is [notes/llm_generation_baseline_code_walkthrough.md](notes/llm_generation_baseline_code_walkthrough.md).
 
 ```bash
 python scripts/fetch_generator_outputs.py        # thesis datasets + CTGAN/TVAE outputs into data/generators/ (git-ignored)
