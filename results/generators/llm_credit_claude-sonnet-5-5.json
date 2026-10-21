@@ -1,0 +1,42 @@
+{
+ "output_csv_path": "/workspaces/tabular-synth-eval-agent/results/generators/llm_credit_claude-sonnet-5-5.csv",
+ "rows_requested": 500,
+ "rows_written": 500,
+ "rows_rejected": 1,
+ "rejection_reasons": {
+  "out_of_range:PAY_AMT1": 1
+ },
+ "batches": 22,
+ "model_requested": "claude-sonnet-5-5",
+ "model_served": "claude-sonnet-5-5",
+ "input_tokens": 117656,
+ "output_tokens": 138843,
+ "estimated_cost_usd": 1.623742,
+ "latency_s": 707.91,
+ "columns": [
+  "LIMIT_BAL",
+  "SEX",
+  "EDUCATION",
+  "MARRIAGE",
+  "AGE",
+  "PAY_0",
+  "PAY_2",
+  "PAY_3",
+  "PAY_4",
+  "PAY_5",
+  "PAY_6",
+  "BILL_AMT1",
+  "BILL_AMT2",
+  "BILL_AMT3",
+  "BILL_AMT4",
+  "BILL_AMT5",
+  "BILL_AMT6",
+  "PAY_AMT1",
+  "PAY_AMT2",
+  "PAY_AMT3",
+  "PAY_AMT4",
+  "PAY_AMT5",
+  "PAY_AMT6",
+  "default.payment.next.month"
+ ]
+}

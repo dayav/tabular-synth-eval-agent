@@ -13,3 +13,5 @@ runs/*
 !runs/README.md
 !runs/summarize.py
 !runs/example/
+# thesis datasets and generator outputs fetched from Hugging Face
+data/

@@ -1,0 +1,31 @@
+{
+ "output_csv_path": "/workspaces/tabular-synth-eval-agent/results/generators/llm_adult_claude-sonnet-5-5.csv",
+ "rows_requested": 500,
+ "rows_written": 500,
+ "rows_rejected": 0,
+ "rejection_reasons": {},
+ "batches": 21,
+ "model_requested": "claude-sonnet-5-5",
+ "model_served": "claude-sonnet-5-5",
+ "input_tokens": 97167,
+ "output_tokens": 70075,
+ "estimated_cost_usd": 0.895084,
+ "latency_s": 374.51,
+ "columns": [
+  "age",
+  "workclass",
+  "fnlwgt",
+  "education",
+  "education-num",
+  "marital-status",
+  "occupation",
+  "relationship",
+  "race",
+  "sex",
+  "capital-gain",
+  "capital-loss",
+  "hours-per-week",
+  "native-country",
+  "income"
+ ]
+}

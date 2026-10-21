@@ -1,5 +1,48 @@
 # Changelog
 
+## Phase 6 — LLM generation baseline (2026-10-21)
+
+### Added
+- `src/generate.py`: `generate_with_llm(real_csv_path, output_csv_path, n_rows, target_column, model, batch_size)`.
+  Summarises the real file into a column schema with marginal statistics only (category
+  levels and frequencies, numeric min/max/mean/std/quantiles, low-cardinality integers
+  treated as categorical), asks Claude for rows as strict JSON through structured output
+  (`output_config.format`), validates every row (known level, numeric type, integer-ness,
+  range with 5% slack), drops the rest, requests more batches up to a budget, writes a CSV
+  and returns counts, rejection reasons, tokens, estimated cost and latency. No real row is
+  ever sent to the model. It is not registered in the evaluation agent's tools: an
+  evaluator must not generate what it grades.
+- `scripts/fetch_generator_outputs.py`: downloads the thesis datasets (adult, cardio,
+  credit; train and test) and the CTGAN/TVAE baseline outputs from the public Hugging Face
+  dataset repo, converting the HDF5 tables to CSV under `data/generators/` (git-ignored).
+- `scripts/compare_generators.py`: for each dataset draws one real reference sample and
+  one held-out test sample, cuts each generator's output to the same number of rows
+  (CTGAN and TVAE from the pipeline, the LLM generated from the reference sample's schema
+  and cached under `results/generators/`), scores all three with the four tools against
+  the same files, asks the evaluation agent for its verdict, and writes
+  `results/generators/comparison.{json,md}` plus the README table between markers.
+- `tests/test_generate.py` (schema summary, strict JSON schema, row validation, batching
+  with a scripted client, attempt budget) and `tests/test_compare_generators.py`.
+- `make fetch-generators`, `make compare-generators`; `tables` in the dev extra.
+
+### Gotchas
+- Structured output accepts no `minItems`/`maxItems` beyond 0/1 on arrays; the batch size
+  is requested in the prompt and enforced by trimming and validation.
+
+### Measured (2026-10-21, 500 rows per generator, adult / cardio / credit)
+- Generation: 500 valid rows per dataset in 20 to 22 batches of 25; 1 row rejected in
+  1,500 (a credit payment amount out of range); about 0.90 / 0.52 / 1.62 USD at list
+  prices, 4 to 12 minutes per dataset.
+- Table in README and `results/generators/comparison.md`. In one line: on the same
+  footing the marginals-only LLM baseline lands in the same band as CTGAN and TVAE on
+  fidelity and utility (utility gaps within ±0.04 for every generator), flags fewer or
+  comparable columns than CTGAN, more than TVAE on the numeric-heavy datasets, has zero
+  exact matches by construction, and identifiability of 0.35 to 0.39. The agent's
+  verdicts and flagged columns agreed with the mechanical flags on all nine outputs.
+- Three public datasets, one draw each, a few hundred rows: a baseline, not a claim
+  about LLMs and tabular data.
+
+
 ## Phase 5 — retrieval over metric documentation (2026-10-21)
 
 ### Added

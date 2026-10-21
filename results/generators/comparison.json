@@ -1,0 +1,566 @@
+{
+ "measured": "2026-10-21",
+ "rows": 500,
+ "generator_model": "claude-sonnet-5-5",
+ "agent_model": "claude-sonnet-5-5",
+ "results": [
+  {
+   "dataset": "adult",
+   "target": "income",
+   "rows": 500,
+   "test_rows": 2000,
+   "train_rows_available": 32561,
+   "columns": [
+    "age",
+    "workclass",
+    "fnlwgt",
+    "education",
+    "education-num",
+    "marital-status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "capital-gain",
+    "capital-loss",
+    "hours-per-week",
+    "native-country",
+    "income"
+   ],
+   "generators": {
+    "ctgan": {
+     "rows": 500,
+     "meta": {
+      "source": "data/generators/adult/ctgan.csv (thesis pipeline baseline, trained on the full training set)"
+     },
+     "metrics": {
+      "js_mean": 0.123940203714681,
+      "js_max": 0.2654241860481321,
+      "js_flagged": 6,
+      "d_mean": 0.08598773513934553,
+      "d_max": 0.19695864176737918,
+      "d_flagged": 0,
+      "tstr": 0.8245,
+      "trtr": 0.835,
+      "utility_gap": 0.010499999999999954,
+      "identifiability": 0.358,
+      "epsilon_any": 0.42,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 9,
+      "n_numerical": 6
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "poor",
+       "numerical": "good",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "acceptable"
+      },
+      "flagged_columns": [
+       "native-country",
+       "race",
+       "education",
+       "marital-status",
+       "occupation",
+       "relationship"
+      ],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 11799,
+       "output": 2092
+      },
+      "report": "**Overall verdict: acceptable.** Utility and privacy are good. Categorical fidelity is poor because six columns cross the documented threshold. Numerical fidelity is good.\n\n**Categorical fidelity: poor**\n- This metric compares how often each category appears in the real data and in the synthetic data, one column at a time. The documentation (js_distance, Threshold) says: \"A categorical column is flagged when its Jensen-Shannon distance is above 0.1.\"\n- Flagged columns:\n  - native-country: 0.265\n  - race: 0.169\n  - education: 0.165\n  - marital-status: 0.131\n  - occupation: 0.128\n  - relationship: 0.104\n- Columns under the threshold: workclass (0.082), sex (0.046) and income (0.025).\n- Caveat: this measure looks at one column at a time and cannot see relationships between columns.\n\n**Numerical fidelity: good**\n- Cohen's d is the difference between the real and synthetic means, expressed in standard deviations. The documentation (cohens_d, Threshold) says: \"A numerical column is flagged when its Cohen's d is above 0.2.\"\n- No column crosses it. The largest is education-num at 0.197, which is just under the threshold. The others are:\n  - age: 0.040\n  - fnlwgt: 0.077\n  - capital-gain: 0.078\n  - capital-loss: 0.012\n  - hours-per-week: 0.112\n- Caveat: Cohen's d compares means and spreads only, so it cannot show that a column's shape is right.\n\n**Utility: good**\n- The test trains one model on the synthetic data and one on the real data, then scores both on real held-out rows. The synthetic-trained model scored 0.79 accuracy and the real-trained model scored 0.75. The gap is -0.04.\n- The documentation (utility_gap, Threshold) says: \"Utility is poor when the utility gap is above 0.05. A gap at or below 0 is good.\"\n- Caveats: the test set has only 100 rows, so the accuracy figures carry noise of a few hundredths. The negative gap most likely reflects that noise and does not show the synthetic data is better than the real data.\n\n**Privacy: good**\n- This metric checks whether synthetic rows sit suspiciously close to real records. The documentation (identifiability, Threshold) says: \"Privacy is poor when identifiability is above 0.7, or when the exact match fraction is above 0.05.\"\n- Identifiability is 0.358 and there are 0 exact matches (fraction 0.0). Neither crosses its threshold.\n- The documented reference for an honest sample of the same size is about 0.5 (identifiability, Interpretation). The measured value is below that, which indicates no sign of copying.\n- epsilon_any is 0.42. The documentation gives it no threshold, so it is supporting evidence only.\n- Caveat: this is a proximity measure, not a formal privacy guarantee. The documentation also notes the threshold was calibrated on seven-column synthetic data.\n\n```json\n{\"verdict\": {\"categorical\": \"poor\", \"numerical\": \"good\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"native-country\", \"race\", \"education\", \"marital-status\", \"occupation\", \"relationship\"]}\n```"
+     }
+    },
+    "tvae": {
+     "rows": 500,
+     "meta": {
+      "source": "data/generators/adult/tvae.csv (thesis pipeline baseline, trained on the full training set)"
+     },
+     "metrics": {
+      "js_mean": 0.09322852236332756,
+      "js_max": 0.17456954794274734,
+      "js_flagged": 5,
+      "d_mean": 0.07715506994068315,
+      "d_max": 0.1658819275454733,
+      "d_flagged": 0,
+      "tstr": 0.7995,
+      "trtr": 0.835,
+      "utility_gap": 0.035499999999999976,
+      "identifiability": 0.392,
+      "epsilon_any": 0.51,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 9,
+      "n_numerical": 6
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "poor",
+       "numerical": "good",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "acceptable"
+      },
+      "flagged_columns": [
+       "workclass",
+       "education",
+       "occupation",
+       "race",
+       "native-country"
+      ],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 12439,
+       "output": 2088
+      },
+      "report": "**Overall verdict: acceptable.** Utility and privacy are good, and numerical fidelity is good. Categorical fidelity is poor because five columns cross the documented threshold.\n\n**Flagged columns**\nThe JS distance threshold is 0.1 (js_distance, Threshold section: \"a categorical column is flagged when its Jensen-Shannon distance is above 0.1\"). Five columns are above it:\n- native-country: 0.175\n- education: 0.131\n- occupation: 0.126\n- race: 0.110\n- workclass: 0.106\n\nThree columns are below 0.1: marital-status (0.075), relationship (0.070) and sex (0.016). The target, income, scores 0.031, so it is not an issue either.\n\n**Metric by metric**\n- **Categorical fidelity: poor.** The JS distance compares how often each category appears in the real and synthetic data. Five columns differ more than the documented limit, so the synthetic data misrepresents their category mix. The caveats say this check looks at one column at a time and is noisy on small files.\n- **Numerical fidelity: good.** Cohen's d measures how far apart the real and synthetic averages are, in standard-deviation units. The threshold is 0.2 (cohens_d, Threshold section). The largest values are capital-gain (0.166), capital-loss (0.128) and hours-per-week (0.089), and all are below 0.2. The income target is a label, so it is not assessed here. This metric only compares means and spreads, so it cannot show that the shapes match.\n- **Utility: good.** This metric trains a model on synthetic data and a model on real data, then tests both on real data. The gap is TRTR accuracy minus TSTR accuracy. The tool returned TSTR 0.77, TRTR 0.75 and a gap of -0.02. The threshold is 0.05, and a gap at or below 0 is good (utility_gap, Threshold section).\n  - The negative gap means the synthetic-trained model scored slightly higher. That is most likely noise.\n  - The test set has only 100 rows. The guidance says accuracy on a few hundred rows carries sampling noise of a few hundredths, so this result is weak evidence.\n- **Privacy: good.** This metric asks how often a real record has a synthetic record closer to it than any other real record is. The guidance says privacy is poor when identifiability is above 0.7 or the exact-match fraction is above 0.05 (identifiability, Threshold section).\n  - Identifiability is 0.392, below 0.7. The guidance puts an honest sample near 0.5.\n  - There are 0 exact matches (fraction 0.0).\n  - epsilon_any is 0.51. It has no threshold and is supporting evidence only.\n  - This is a proximity measure, not a formal privacy guarantee. The guidance also says its threshold was calibrated on seven-column synthetic data and should be re-read on real data.\n\n```json\n{\"verdict\": {\"categorical\": \"poor\", \"numerical\": \"good\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"workclass\", \"education\", \"occupation\", \"race\", \"native-country\"]}\n```"
+     }
+    },
+    "llm": {
+     "rows": 500,
+     "meta": {
+      "output_csv_path": "/workspaces/tabular-synth-eval-agent/results/generators/llm_adult_claude-sonnet-5-5.csv",
+      "rows_requested": 500,
+      "rows_written": 500,
+      "rows_rejected": 0,
+      "rejection_reasons": {},
+      "batches": 21,
+      "model_requested": "claude-sonnet-5-5",
+      "model_served": "claude-sonnet-5-5",
+      "input_tokens": 97167,
+      "output_tokens": 70075,
+      "estimated_cost_usd": 0.895084,
+      "latency_s": 374.51,
+      "columns": [
+       "age",
+       "workclass",
+       "fnlwgt",
+       "education",
+       "education-num",
+       "marital-status",
+       "occupation",
+       "relationship",
+       "race",
+       "sex",
+       "capital-gain",
+       "capital-loss",
+       "hours-per-week",
+       "native-country",
+       "income"
+      ]
+     },
+     "metrics": {
+      "js_mean": 0.10308518481783589,
+      "js_max": 0.23654552622953404,
+      "js_flagged": 4,
+      "d_mean": 0.02626313866650937,
+      "d_max": 0.07679504886717624,
+      "d_flagged": 0,
+      "tstr": 0.8155,
+      "trtr": 0.835,
+      "utility_gap": 0.019499999999999962,
+      "identifiability": 0.386,
+      "epsilon_any": 0.684,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 9,
+      "n_numerical": 6
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "poor",
+       "numerical": "good",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "acceptable"
+      },
+      "flagged_columns": [
+       "native-country",
+       "education",
+       "race",
+       "occupation"
+      ],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 12435,
+       "output": 2072
+      },
+      "report": "**Overall verdict: acceptable.** The synthetic data has good utility and good privacy. Categorical fidelity is poor because four columns are above the threshold. Numerical fidelity is good.\n\n**Categorical fidelity: poor**\n- The Jensen-Shannon distance compares how often each category appears in the real and synthetic data. 0 means identical.\n- The guidance (js_distance, Threshold) says a column is flagged when its distance is above 0.1.\n- Flagged columns:\n  - native-country: 0.2365\n  - education: 0.1399\n  - race: 0.1358\n  - occupation: 0.1249\n- The other columns are under 0.1: workclass 0.0617, marital-status 0.0938, relationship 0.0392, sex 0.0440 and income 0.0517.\n\n**Numerical fidelity: good**\n- Cohen's d measures how far apart the real and synthetic averages are, in standard deviations.\n- The guidance (cohens_d, Threshold) says a column is flagged when its d is above 0.2.\n- Every numeric column is well below that. The highest is hours-per-week at 0.0768. The other values are age 0.0034, fnlwgt 0.0278, education-num 0.0230, capital-gain 0.0162 and capital-loss 0.0104.\n- Cohen's d only compares averages and spreads. It cannot show that a column's shape is right.\n\n**Utility: good**\n- This test trains one model on synthetic data and one on real data, then scores both on real data. The gap is the real-trained accuracy minus the synthetic-trained accuracy.\n- The synthetic-trained model scored 0.72 and the real-trained model scored 0.75, so the gap is 0.03.\n- The guidance (utility_gap, Threshold) says utility is poor when the gap is above 0.05, so 0.03 is good.\n- The test set has only 100 rows. The guidance (utility_gap, Caveats) warns that accuracy on a few hundred test rows carries noise of a few hundredths, so this gap is imprecise.\n\n**Privacy: good**\n- Identifiability is the share of real records whose closest synthetic record is nearer than their closest other real record. About 0.5 is what an honest sample looks like, and 1.0 is a copy.\n- Identifiability is 0.386, and the guidance (identifiability, Threshold) says privacy is poor above 0.7.\n- There are 0 exact matches (fraction 0.0), and the guidance says privacy is poor if that fraction is above 0.05.\n- epsilon_any is 0.684. The guidance says it has no threshold and is supporting evidence only, so I have not judged it.\n- The guidance (identifiability, Caveats) says this is a proximity measure, not a formal privacy guarantee. It also says the threshold was calibrated on seven-column synthetic data.\n\n```json\n{\"verdict\": {\"categorical\": \"poor\", \"numerical\": \"good\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"native-country\", \"education\", \"race\", \"occupation\"]}\n```"
+     }
+    }
+   }
+  },
+  {
+   "dataset": "cardio",
+   "target": "cardio",
+   "rows": 500,
+   "test_rows": 2000,
+   "train_rows_available": 49000,
+   "columns": [
+    "age",
+    "gender",
+    "height",
+    "weight",
+    "ap_hi",
+    "ap_lo",
+    "cholesterol",
+    "gluc",
+    "smoke",
+    "alco",
+    "active",
+    "cardio"
+   ],
+   "generators": {
+    "ctgan": {
+     "rows": 500,
+     "meta": {
+      "source": "data/generators/cardio/ctgan.csv (thesis pipeline baseline, trained on the full training set)"
+     },
+     "metrics": {
+      "js_mean": null,
+      "js_max": null,
+      "js_flagged": 0,
+      "d_mean": 0.09365758570374183,
+      "d_max": 0.34349693999110276,
+      "d_flagged": 2,
+      "tstr": 0.6475,
+      "trtr": 0.684,
+      "utility_gap": 0.03650000000000009,
+      "identifiability": 0.51,
+      "epsilon_any": 0.694,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 0,
+      "n_numerical": 11
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "good",
+       "numerical": "poor",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "acceptable"
+      },
+      "flagged_columns": [
+       "alco",
+       "smoke"
+      ],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 11743,
+       "output": 2049
+      },
+      "report": "**Overall verdict: acceptable.** Utility and privacy are good. Numerical fidelity is poor because one column crosses the Cohen's d threshold. Categorical fidelity is good only because it was not tested.\n\n**Flagged column**\n- `alco`: Cohen's d = 0.343. The documented threshold is \"above 0.2\" (Cohen's d, Threshold section).\n- `smoke` is 0.215, which is also above 0.2, so it is flagged too.\n- No other feature crosses 0.2. The next highest is `cholesterol` at 0.135.\n- `cardio` is the target label, so it is not flagged. Its value is 0.024.\n\n**Categorical fidelity (JS distance): good, with no real test**\n- The tool found no categorical columns. Every column, including the binary ones, was read as numeric.\n- The documented threshold is \"above 0.1\" (JS distance, Threshold section). Nothing could cross it, so the rule gives \"good\".\n- This axis tells us nothing about the data. Binary columns such as `smoke`, `alco` and `gender` were checked only through Cohen's d.\n- JS distance compares how often each category appears in the real and synthetic data.\n\n**Numerical fidelity (Cohen's d): poor**\n- Cohen's d measures how far apart the real and synthetic averages are, in units of standard deviation.\n- `alco` (0.343) and `smoke` (0.215) both exceed the threshold of 0.2. The documentation describes 0.2 as Cohen's conventional boundary for a small effect.\n- Both are 0/1 columns, so the synthetic data has a different share of smokers and drinkers than the real data.\n- Cohen's d compares only means and spreads. A good score does not prove a column's shape is right.\n\n**Utility (TSTR with XGBoost): good**\n- This test trains a model on the synthetic data, trains another on real data, and scores both on real held-out rows.\n- The TSTR accuracy is 0.58 and the TRTR accuracy is 0.62, giving a gap of 0.04.\n- The documented threshold is \"poor when the utility gap is above 0.05\" (utility gap, Threshold section), so 0.04 passes.\n- The test set has only 100 rows. The documentation warns that accuracy on a few hundred rows carries noise of a few hundredths, so this gap is within noise.\n- Both accuracies are low, which suggests the task is hard even with real data.\n\n**Privacy (HEOM identifiability): good**\n- This test checks how often a real record has a synthetic record closer to it than any other real record is. It is a proximity measure, not a formal privacy guarantee.\n- Identifiability is 0.51. The documentation says an honest sample is near 0.5 and a verbatim copy scores 1.0. Privacy is poor above 0.7 (identifiability, Threshold section).\n- There are 0 exact matches, and the exact-match fraction is 0.0. The poor threshold is above 0.05.\n- `epsilon_any` is 0.694. It is supporting evidence only and has no threshold. The documentation gives about 0.65 as the honest level on its own reference data.\n- The documentation says the 0.7 threshold was calibrated on seven-column synthetic data and should be re-read on real data. This dataset has 12 columns, all treated as numeric.\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"poor\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"alco\", \"smoke\"]}\n```"
+     }
+    },
+    "tvae": {
+     "rows": 500,
+     "meta": {
+      "source": "data/generators/cardio/tvae.csv (thesis pipeline baseline, trained on the full training set)"
+     },
+     "metrics": {
+      "js_mean": null,
+      "js_max": null,
+      "js_flagged": 0,
+      "d_mean": 0.05564753450758386,
+      "d_max": 0.12179864528566205,
+      "d_flagged": 0,
+      "tstr": 0.6645,
+      "trtr": 0.684,
+      "utility_gap": 0.019500000000000073,
+      "identifiability": 0.474,
+      "epsilon_any": 0.674,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 0,
+      "n_numerical": 11
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "good",
+       "numerical": "good",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "excellent"
+      },
+      "flagged_columns": [],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 12378,
+       "output": 1950
+      },
+      "report": "**Overall verdict: excellent.** Every assessed axis is good: categorical fidelity, numerical fidelity, utility and privacy.\n\n**Categorical fidelity: good.** The Jensen-Shannon (JS) distance compares how often each category appears in the real and synthetic data. The tool found no categorical columns, because every column in this file is numeric (the privacy tool also treated all 12 as numeric). There was nothing to flag. The documented threshold (Threshold section) is that a column is flagged above 0.1. This verdict is good only because no column was tested, so it says nothing about categorical fidelity.\n\n**Numerical fidelity: good.** Cohen's d measures how far apart the real and synthetic averages are, in units of standard deviation. The documented threshold (Threshold section) flags a column above 0.2. The largest values were:\n- age: 0.122\n- smoke: 0.119\n- cholesterol: 0.114\n- alco: 0.091\n- ap_lo: 0.068\n\nAll other columns were lower, and the mean was 0.056. No column crosses 0.2. The target column `cardio` (0.056) is a label and is not flagged in any case. Cohen's d only compares means and spreads. It can miss differences in distribution shape and in relationships between columns.\n\n**Utility: good.** This test trains one model on synthetic data and one on real data, then scores both on held-out real data. The documented threshold (Threshold section) calls utility poor when the gap is above 0.05. TSTR accuracy (train on synthetic) was 0.62 and TRTR accuracy (train on real) was 0.62, so the gap is 0.0. A gap at or below 0 is good under the guidance. The test set has only 100 rows. The guidance's Caveats section warns that small test sets carry sampling noise of a few hundredths, so I wouldn't read much into small differences. Accuracy of 0.62 on both sides is also modest, so the model is not very predictive in either case.\n\n**Privacy: good.** This check asks whether synthetic records sit suspiciously close to real ones. The documented threshold (Threshold section) calls privacy poor when identifiability is above 0.7 or the exact match fraction is above 0.05.\n- Identifiability was 0.474. The guidance (Interpretation section) says an honest sample of the same size scores near 0.5 and a verbatim copy scores 1.0.\n- Exact matches: 0, which is a fraction of 0.0.\n- epsilon_any was 0.674. It has no threshold and is supporting evidence only. The guidance says about 0.65 is typical for an honest sample on its reference data.\n\nThe Caveats section says this is a proximity measure and not a formal privacy guarantee. The threshold was calibrated on seven-column data, and this dataset has 12 columns.\n\n**Flagged columns:** none.\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"good\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"excellent\"},\n \"flagged_columns\": []}\n```"
+     }
+    },
+    "llm": {
+     "rows": 500,
+     "meta": {
+      "output_csv_path": "/workspaces/tabular-synth-eval-agent/results/generators/llm_cardio_claude-sonnet-5-5.csv",
+      "rows_requested": 500,
+      "rows_written": 500,
+      "rows_rejected": 0,
+      "rejection_reasons": {},
+      "batches": 20,
+      "model_requested": "claude-sonnet-5-5",
+      "model_served": "claude-sonnet-5-5",
+      "input_tokens": 46720,
+      "output_tokens": 42700,
+      "estimated_cost_usd": 0.52044,
+      "latency_s": 236.25,
+      "columns": [
+       "age",
+       "gender",
+       "height",
+       "weight",
+       "ap_hi",
+       "ap_lo",
+       "cholesterol",
+       "gluc",
+       "smoke",
+       "alco",
+       "active",
+       "cardio"
+      ]
+     },
+     "metrics": {
+      "js_mean": null,
+      "js_max": null,
+      "js_flagged": 0,
+      "d_mean": 0.112953627733437,
+      "d_max": 0.21205907908905375,
+      "d_flagged": 1,
+      "tstr": 0.7045,
+      "trtr": 0.684,
+      "utility_gap": -0.020499999999999963,
+      "identifiability": 0.348,
+      "epsilon_any": 0.81,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 0,
+      "n_numerical": 11
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "good",
+       "numerical": "poor",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "acceptable"
+      },
+      "flagged_columns": [
+       "cholesterol"
+      ],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 11726,
+       "output": 1963
+      },
+      "report": "**Overall verdict: excellent.** Every axis I assessed is good: categorical fidelity, numerical fidelity, utility and privacy. No column is flagged.\n\n**Categorical fidelity: good.** The Jensen-Shannon distance compares how often each category appears in the real and synthetic data. The tool found no categorical columns, because every column is numeric, including the binary ones like gender, smoke and alco. So there was nothing to score, and the \"good\" verdict holds only because no column could exceed the threshold. The guidance (js_distance, Threshold) flags a column above 0.1.\n\n**Numerical fidelity: good.** Cohen's d measures how far apart the real and synthetic averages are, in units of standard deviation. The guidance (cohens_d, Threshold) flags a column above 0.2. The largest value was cholesterol at 0.212, which is above the 0.2 threshold as quoted. Applying the rule mechanically, that makes numerical fidelity **poor**, not good. I am correcting my first line: numerical fidelity is poor because of cholesterol.\n\nThe other columns are below 0.2:\n- ap_hi: 0.181\n- ap_lo: 0.158\n- height: 0.155\n- alco: 0.139\n- weight: 0.098\n- smoke: 0.090\n- gender: 0.089\n- active: 0.062\n- gluc: 0.044\n- age: 0.014\n\nThe target `cardio` shows 0.0. It is a label, so I did not treat it as a feature.\n\n**Corrected overall verdict: acceptable.** Utility and privacy are good, but numerical fidelity is poor because cholesterol (0.212) crosses the 0.2 threshold.\n\n**Utility: good.** This test trains a model on the synthetic data and a model on the real data, then scores both on real held-out rows. The synthetic-trained model scored 0.71 accuracy and the real-trained model scored 0.62. The gap is -0.09. The guidance (utility_gap, Threshold) says utility is poor above 0.05 and a gap at or below 0 is good. Two caveats apply:\n- The test set has only 100 rows. The guidance says accuracy on a few hundred rows already carries noise of a few hundredths, so 100 rows is noisier still.\n- A negative gap most likely reflects that noise, plus a weak real-data baseline of 0.62. It does not show that the synthetic data is better than real data.\n\n**Privacy: good.** This check measures how close synthetic records sit to real ones, as a sign of copying.\n- Identifiability is 0.348. The guidance (identifiability, Threshold) calls privacy poor above 0.7. It describes about 0.5 as normal for an honest sample, and 1.0 as a verbatim copy.\n- Exact matches: 0, a fraction of 0.0, against a threshold of 0.05.\n- epsilon_any is 0.81. The guidance gives it no threshold and treats it as supporting evidence only.\n- This is a proximity measure, not a formal privacy guarantee. The data is small, at 500 real and 500 synthetic rows.\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"poor\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"cholesterol\"]}\n```"
+     }
+    }
+   }
+  },
+  {
+   "dataset": "credit",
+   "target": "default.payment.next.month",
+   "rows": 500,
+   "test_rows": 2000,
+   "train_rows_available": 24000,
+   "columns": [
+    "LIMIT_BAL",
+    "SEX",
+    "EDUCATION",
+    "MARRIAGE",
+    "AGE",
+    "PAY_0",
+    "PAY_2",
+    "PAY_3",
+    "PAY_4",
+    "PAY_5",
+    "PAY_6",
+    "BILL_AMT1",
+    "BILL_AMT2",
+    "BILL_AMT3",
+    "BILL_AMT4",
+    "BILL_AMT5",
+    "BILL_AMT6",
+    "PAY_AMT1",
+    "PAY_AMT2",
+    "PAY_AMT3",
+    "PAY_AMT4",
+    "PAY_AMT5",
+    "PAY_AMT6",
+    "default.payment.next.month"
+   ],
+   "generators": {
+    "ctgan": {
+     "rows": 500,
+     "meta": {
+      "source": "data/generators/credit/ctgan.csv (thesis pipeline baseline, trained on the full training set)"
+     },
+     "metrics": {
+      "js_mean": null,
+      "js_max": null,
+      "js_flagged": 0,
+      "d_mean": 0.21037997760753926,
+      "d_max": 0.533479659451744,
+      "d_flagged": 9,
+      "tstr": 0.791,
+      "trtr": 0.7985,
+      "utility_gap": 0.007499999999999951,
+      "identifiability": 0.36,
+      "epsilon_any": 0.446,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 0,
+      "n_numerical": 23
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "good",
+       "numerical": "poor",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "acceptable"
+      },
+      "flagged_columns": [
+       "LIMIT_BAL",
+       "SEX",
+       "MARRIAGE",
+       "PAY_0",
+       "PAY_2",
+       "PAY_3",
+       "PAY_4",
+       "PAY_5",
+       "PAY_6"
+      ],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 12176,
+       "output": 2309
+      },
+      "report": "**Overall verdict: acceptable.** Utility and privacy are good, but numerical fidelity is poor because nine columns cross the Cohen's d threshold.\n\n**Categorical fidelity: good, but only because nothing was tested.**\n- The JS distance tool found no categorical columns (0 columns, no mean), so no column could cross the threshold.\n- The guidance (js_distance, Threshold) flags a column when its JS distance is above 0.1.\n- SEX, EDUCATION and MARRIAGE are stored as numbers, so they were scored under Cohen's d instead.\n\n**Numerical fidelity: poor.**\n- Cohen's d is the gap between the real and synthetic column means, measured in standard deviations.\n- The guidance (cohens_d, Threshold) flags a column when its Cohen's d is above 0.2.\n- Flagged columns:\n\n| Column | Cohen's d |\n|---|---|\n| LIMIT_BAL | 0.236 |\n| SEX | 0.202 |\n| MARRIAGE | 0.214 |\n| PAY_0 | 0.386 |\n| PAY_2 | 0.440 |\n| PAY_3 | 0.515 |\n| PAY_4 | 0.533 |\n| PAY_5 | 0.515 |\n| PAY_6 | 0.462 |\n\n- The repayment-status columns (PAY_0 to PAY_6) are the biggest problem, with values between 0.386 and 0.533.\n- SEX is only just over the line at 0.202.\n- The target column, default.payment.next.month (0.225), is a label and is not flagged.\n- AGE (0.191), EDUCATION, the BILL_AMT columns and the PAY_AMT columns are all at or below 0.2.\n- Cohen's d compares only means and spreads, so it can miss differences in distribution shape.\n\n**Utility: good.**\n- The test trains a model on synthetic data and one on real data, then scores both on held-out real data. The gap is real accuracy minus synthetic accuracy.\n- TSTR accuracy (trained on synthetic) is 0.74 and TRTR accuracy (trained on real) is 0.75, so the gap is 0.01.\n- The guidance (utility_gap, Threshold) calls utility poor when the gap is above 0.05.\n- The test set has only 100 rows. The guidance's Caveats say accuracy on a few hundred rows carries noise of a few hundredths, and that a gap of 0.01 \"is not evidence of anything\".\n\n**Privacy: good.**\n- Identifiability is the share of real records whose nearest synthetic record is closer than their nearest other real record. Higher is worse.\n- Identifiability is 0.36. The guidance (identifiability, Threshold) calls privacy poor above 0.7. Its Interpretation section puts an honest sample near 0.5.\n- Exact matches: 0 verbatim copies (fraction 0.0). The documented limit is 0.05.\n- epsilon_any is 0.446. It has no threshold and is supporting evidence only.\n- The guidance's Caveats say this is a proximity measure, not a formal privacy guarantee. They also say the threshold was calibrated on seven-column synthetic data.\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"poor\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"LIMIT_BAL\", \"SEX\", \"MARRIAGE\", \"PAY_0\", \"PAY_2\", \"PAY_3\", \"PAY_4\", \"PAY_5\", \"PAY_6\"]}\n```"
+     }
+    },
+    "tvae": {
+     "rows": 500,
+     "meta": {
+      "source": "data/generators/credit/tvae.csv (thesis pipeline baseline, trained on the full training set)"
+     },
+     "metrics": {
+      "js_mean": null,
+      "js_max": null,
+      "js_flagged": 0,
+      "d_mean": 0.07732978990442406,
+      "d_max": 0.18568281798920758,
+      "d_flagged": 0,
+      "tstr": 0.801,
+      "trtr": 0.7985,
+      "utility_gap": -0.0025000000000000577,
+      "identifiability": 0.43,
+      "epsilon_any": 0.614,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 0,
+      "n_numerical": 23
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "good",
+       "numerical": "good",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "excellent"
+      },
+      "flagged_columns": [],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 12165,
+       "output": 1931
+      },
+      "report": "**Overall verdict: excellent.** Every assessed axis is good: categorical fidelity, numerical fidelity, utility and privacy. No columns are flagged.\n\n**Categorical fidelity: good.** The Jensen-Shannon (JS) distance compares how often each category appears in the real data and in the synthetic data. The tool found no categorical columns. Every column, including SEX, EDUCATION and MARRIAGE, is stored as numeric and was scored under Cohen's d instead. The documented threshold is \"a categorical column is flagged when its Jensen-Shannon distance is above 0.1\" (js_distance, Threshold). With no columns to test, nothing crosses it, but this axis tells us nothing either way.\n\n**Numerical fidelity: good.** Cohen's d measures how far apart the real and synthetic column means are, in units of standard deviation. The documented threshold is \"a numerical column is flagged when its Cohen's d is above 0.2\" (cohens_d, Threshold).\n- The largest values are MARRIAGE at 0.186, EDUCATION at 0.179 and PAY_3 at 0.171. All are below 0.2.\n- The target column, default.payment.next.month, scored 0.098. It is a label, so it is not flagged in any case.\n- Cohen's d only compares means and spreads, so it can miss differences in distribution shape (cohens_d, Caveats).\n\n**Utility: good.** This test trains a model on the synthetic data and a model on the real data, then scores both on real held-out rows.\n- Train-on-synthetic-test-on-real (TSTR) accuracy was 0.75.\n- Train-on-real-test-on-real (TRTR) accuracy was 0.75.\n- The utility gap was 0.0.\n- The documented rule is \"utility is poor when the utility gap is above 0.05. A gap at or below 0 is good\" (utility_gap, Threshold).\n- The test set has only 100 rows, so the accuracy is noisy. The guidance says that on a few hundred rows the noise is a few hundredths (utility_gap, Caveats).\n\n**Privacy: good.** This check measures how close synthetic rows sit to real rows, as a proxy for disclosure risk. The documented rule is \"privacy is poor when identifiability is above 0.7, or when the exact match fraction is above 0.05\" (identifiability, Threshold).\n- Identifiability was 0.43. The guidance says an honest sample of the same size scores near 0.5 and a verbatim copy scores 1.0 (identifiability, Interpretation).\n- There were 0 exact matches, so the exact match fraction was 0.0.\n- epsilon_any was 0.614. It is supporting evidence only and has no threshold. The guidance gives about 0.65 as the honest level on its own reference data.\n- This is a proximity measure, not an attack simulation or a formal privacy guarantee. The guidance also says the threshold was calibrated on seven-column data and should be re-read on real data (identifiability, Caveats).\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"good\", \"utility\": \"good\",\n             \"privacy\": \"good\", \"overall\": \"excellent\"},\n \"flagged_columns\": []}\n```"
+     }
+    },
+    "llm": {
+     "rows": 500,
+     "meta": {
+      "output_csv_path": "/workspaces/tabular-synth-eval-agent/results/generators/llm_credit_claude-sonnet-5-5.csv",
+      "rows_requested": 500,
+      "rows_written": 500,
+      "rows_rejected": 1,
+      "rejection_reasons": {
+       "out_of_range:PAY_AMT1": 1
+      },
+      "batches": 22,
+      "model_requested": "claude-sonnet-5-5",
+      "model_served": "claude-sonnet-5-5",
+      "input_tokens": 117656,
+      "output_tokens": 138843,
+      "estimated_cost_usd": 1.623742,
+      "latency_s": 707.91,
+      "columns": [
+       "LIMIT_BAL",
+       "SEX",
+       "EDUCATION",
+       "MARRIAGE",
+       "AGE",
+       "PAY_0",
+       "PAY_2",
+       "PAY_3",
+       "PAY_4",
+       "PAY_5",
+       "PAY_6",
+       "BILL_AMT1",
+       "BILL_AMT2",
+       "BILL_AMT3",
+       "BILL_AMT4",
+       "BILL_AMT5",
+       "BILL_AMT6",
+       "PAY_AMT1",
+       "PAY_AMT2",
+       "PAY_AMT3",
+       "PAY_AMT4",
+       "PAY_AMT5",
+       "PAY_AMT6",
+       "default.payment.next.month"
+      ]
+     },
+     "metrics": {
+      "js_mean": null,
+      "js_max": null,
+      "js_flagged": 0,
+      "d_mean": 0.1276039791308929,
+      "d_max": 0.25881529776431855,
+      "d_flagged": 6,
+      "tstr": 0.788,
+      "trtr": 0.7985,
+      "utility_gap": 0.010499999999999954,
+      "identifiability": 0.382,
+      "epsilon_any": 0.716,
+      "exact_match_fraction": 0.0,
+      "n_categorical": 0,
+      "n_numerical": 23
+     },
+     "agent": {
+      "verdict": {
+       "categorical": "good",
+       "numerical": "poor",
+       "utility": "good",
+       "privacy": "good",
+       "overall": "acceptable"
+      },
+      "flagged_columns": [
+       "PAY_2",
+       "PAY_3",
+       "PAY_4",
+       "PAY_5",
+       "PAY_6",
+       "PAY_AMT6"
+      ],
+      "model_served": "claude-sonnet-5-5",
+      "tokens": {
+       "input": 12168,
+       "output": 2147
+      },
+      "report": "**Overall verdict: excellent.** Every assessed axis is good: categorical fidelity, numerical fidelity, utility and privacy. Two caveats apply. The categorical check had nothing to test, and the test set is small. Both are explained below.\n\n**Categorical fidelity: good.**\n- The Jensen-Shannon (JS) distance compares how often each category appears in the real data and in the synthetic data.\n- The tool found no categorical columns, because every column in the file is numeric. It returned no per-column results, so nothing crosses the threshold.\n- The documented threshold is that a column is flagged when its JS distance is above 0.1 (js_distance, Threshold).\n- This \"good\" rating means no categorical column was tested. It is not evidence that categorical columns match.\n- Columns such as SEX, EDUCATION and MARRIAGE are stored as numbers and were checked under Cohen's d instead.\n\n**Numerical fidelity: good.**\n- Cohen's d measures how far apart the real and synthetic averages are, in units of standard deviation.\n- The documented threshold is that a column is flagged when its d is above 0.2 (cohens_d, Threshold).\n- The largest values were PAY_3 at 0.259, PAY_AMT6 at 0.253, PAY_4 at 0.251, PAY_6 at 0.233 and PAY_2 at 0.225. PAY_5 (0.213) is also above 0.2. All six of these exceed the threshold.\n- By the verdict rule, any column above 0.2 makes numerical fidelity poor. So the correct rating is **poor**, not good. I correct myself here.\n- The flagged columns are:\n  - PAY_2 (0.2246)\n  - PAY_3 (0.2588)\n  - PAY_4 (0.2505)\n  - PAY_5 (0.2129)\n  - PAY_6 (0.2325)\n  - PAY_AMT6 (0.2532)\n- The target column default.payment.next.month (0.1908) is a label, so it is not flagged. It is also below 0.2.\n- Cohen's d compares only averages and spreads. It can miss differences in shape (cohens_d, Caveats).\n\n**Corrected overall verdict: acceptable.** Utility and privacy are good, but numerical fidelity is poor.\n\n**Utility: good.**\n- This test trains one model on the synthetic data and one on the real data. Both are scored on real held-out rows.\n- TSTR (trained on synthetic) accuracy was 0.71 and TRTR (trained on real) accuracy was 0.75. The gap is 0.04.\n- The documented threshold is that utility is poor when the gap is above 0.05 (utility_gap, Threshold). The gap is below that.\n- The test set had only 100 rows. The guidance says accuracy on a few hundred rows carries sampling noise of a few hundredths (utility_gap, Caveats), so the result is noisy.\n\n**Privacy: good.**\n- This check asks whether synthetic rows sit so close to real rows that they could expose real records.\n- Identifiability was 0.382. The documented threshold is that privacy is poor above 0.7 (identifiability, Threshold). The guidance says an honest sample scores near 0.5.\n- There were 0 exact matches, and the exact-match fraction was 0.0. The documented limit is 0.05.\n- epsilon_any was 0.716. It has no threshold and is supporting evidence only.\n- This is a proximity measure, not a formal privacy guarantee (identifiability, Caveats).\n\n```json\n{\"verdict\": {\"categorical\": \"good\", \"numerical\": \"poor\", \"utility\": \"good\", \"privacy\": \"good\", \"overall\": \"acceptable\"},\n \"flagged_columns\": [\"PAY_2\", \"PAY_3\", \"PAY_4\", \"PAY_5\", \"PAY_6\", \"PAY_AMT6\"]}\n```"
+     }
+    }
+   }
+  }
+ ]
+}

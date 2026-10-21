@@ -6,7 +6,7 @@ PY    ?= python
 IMAGE ?= ghcr.io/dayav/tabular-synth-eval-agent:local
 PORT  ?= 8000
 
-.PHONY: test regression unit eval eval-nojudge compare cases fixtures figures typecheck lint runs example api docker-build docker-run lock
+.PHONY: fetch-generators compare-generators test regression unit eval eval-nojudge compare cases fixtures figures typecheck lint runs example api docker-build docker-run lock
 
 test: unit regression
 
@@ -60,3 +60,9 @@ docker-run:  # serves on $(PORT); run folders land in ./runs via the volume moun
 
 lock:  # refresh requirements.lock from the current environment (direct deps + their resolved set)
 	$(PY) -m pip freeze | grep -iE "^(anthropic|pandas|scikit-learn|scipy|xgboost|numpy|python-dotenv|fastapi|uvicorn|python-multipart|pydantic|pydantic_core|starlette|httpx2|anyio|joblib|threadpoolctl|annotated-types|typing_extensions|h11|click|sniffio|distro|jiter|docstring-parser|python-dateutil|pytz|tzdata|six|idna|certifi|uvloop|httptools|websockets|watchfiles|PyYAML|annotated-doc)==" | sort -f > requirements.lock
+
+fetch-generators:  # thesis datasets + CTGAN/TVAE outputs into data/generators/ (needs the 'tables' package)
+	$(PY) scripts/fetch_generator_outputs.py
+
+compare-generators:  # scores CTGAN, TVAE and the LLM baseline with the four tools and the agent; updates the README table
+	$(PY) scripts/compare_generators.py

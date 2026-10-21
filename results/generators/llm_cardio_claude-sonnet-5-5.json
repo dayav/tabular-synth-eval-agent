@@ -1,0 +1,28 @@
+{
+ "output_csv_path": "/workspaces/tabular-synth-eval-agent/results/generators/llm_cardio_claude-sonnet-5-5.csv",
+ "rows_requested": 500,
+ "rows_written": 500,
+ "rows_rejected": 0,
+ "rejection_reasons": {},
+ "batches": 20,
+ "model_requested": "claude-sonnet-5-5",
+ "model_served": "claude-sonnet-5-5",
+ "input_tokens": 46720,
+ "output_tokens": 42700,
+ "estimated_cost_usd": 0.52044,
+ "latency_s": 236.25,
+ "columns": [
+  "age",
+  "gender",
+  "height",
+  "weight",
+  "ap_hi",
+  "ap_lo",
+  "cholesterol",
+  "gluc",
+  "smoke",
+  "alco",
+  "active",
+  "cardio"
+ ]
+}

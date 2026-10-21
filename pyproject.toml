@@ -29,6 +29,7 @@ dev = [
     "ruff",
     "matplotlib",
     "httpx",
+    "tables",
 ]
 
 [tool.pytest.ini_options]
