@@ -25,6 +25,9 @@
 - Unit tests for the tool: exact copy maximal, honest sample near 0.5, far sample zero,
   HEOM distance units, `k`, `exclude_columns`, missing values, size-matched subsample.
 - API: `assess_privacy` form field on `POST /evaluate`; `Verdict.privacy`.
+- `notes/privacy_tool.md` (design, calibration figures, references) and
+  `notes/privacy_tool_code_walkthrough.md` (file-by-file); figures computed from the golden
+  data by `notes/figures/make_privacy_figures.py`.
 
 ### Measured (design calibration, 2026-10-21, 2000-row golden data)
 - identifiability: copy 1.00, honest re-draw 0.49, copy + 0.2 sd jitter 0.83,
