@@ -22,6 +22,7 @@ from anthropic import Anthropic
 from anthropic.types import MessageParam, ToolParam, ToolResultBlockParam
 from dotenv import load_dotenv
 
+from guidance import GuidanceResult, lookup, thresholds
 from report import save_report
 from runlog import DEFAULT_RUNS_DIR, write_run
 from tools import (
@@ -39,11 +40,15 @@ load_dotenv()
 DEFAULT_MODEL: str = "claude-sonnet-4-6"
 DEFAULT_MAX_TOKENS: int = 16000
 
-JS_THRESHOLD: float = 0.1
-COHEN_D_THRESHOLD: float = 0.2
-UTILITY_GAP_THRESHOLD: float = 0.05
-IDENTIFIABILITY_THRESHOLD: float = 0.7
-EXACT_MATCH_THRESHOLD: float = 0.05
+# Thresholds live in docs/metrics/*.md (front matter). They are read here for the tools'
+# programmatic callers and for the eval harness; the model itself gets them through the
+# lookup_metric_guidance tool, never from the prompt.
+_T = thresholds()
+JS_THRESHOLD: float = float(_T["js_distance"]["threshold"])
+COHEN_D_THRESHOLD: float = float(_T["cohens_d"]["threshold"])
+UTILITY_GAP_THRESHOLD: float = float(_T["utility_gap"]["threshold"])
+IDENTIFIABILITY_THRESHOLD: float = float(_T["identifiability"]["threshold"])
+EXACT_MATCH_THRESHOLD: float = float(_T["identifiability"]["exact_match_threshold"])
 
 _client: Anthropic | None = None
 
@@ -64,37 +69,39 @@ def get_client() -> Anthropic:
     return _client
 
 
-SYSTEM_PROMPT: str = f"""You are an expert in evaluating synthetic tabular data.
+SYSTEM_PROMPT: str = """You are an expert in evaluating synthetic tabular data.
 
-You have four tools available:
+You have five tools available:
 - js_divergence_categorical: fidelity of categorical columns (Jensen-Shannon distance)
 - cohen_d_numerical: fidelity of numerical columns (Cohen's d)
 - tstr_xgboost: predictive utility (train-on-synthetic vs train-on-real)
 - identifiability_heom: privacy (disclosure risk): nearest-neighbour identifiability in HEOM space
+- lookup_metric_guidance: retrieves the metric documentation (definitions, thresholds,
+  interpretation, caveats, citations)
 
 When asked to evaluate a synthetic dataset, call js_divergence_categorical, cohen_d_numerical
 and tstr_xgboost exactly once each, with the real and synthetic paths you were given and, for
 tstr_xgboost, the target column you were given. Call identifiability_heom exactly once, in
 addition, only when the request asks about privacy, disclosure risk, re-identification,
-memorisation or copying; do not call it otherwise. Then write a short plain-English report.
+memorisation or copying; do not call it otherwise.
 
-Thresholds (the only thresholds you may use):
-- A categorical column is flagged when its JS distance is above {JS_THRESHOLD}.
-- A numerical column is flagged when its Cohen's d is above {COHEN_D_THRESHOLD}.
-- Utility is poor when the utility gap (TRTR accuracy minus TSTR accuracy) is above
-  {UTILITY_GAP_THRESHOLD}. A gap at or below 0 is good: the synthetic data lost no utility.
-- Privacy is poor when identifiability is above {IDENTIFIABILITY_THRESHOLD} (an honest sample
-  of the same size as the real data sits near 0.5; a copy scores 1.0), or when
-  exact_match_fraction is above {EXACT_MATCH_THRESHOLD} (verbatim real rows in the synthetic
-  data). epsilon_any is supporting evidence only: its level for an honest sample is high and
-  data-dependent, so never apply a threshold to it.
+Thresholds come from the documentation, not from memory. Before writing the report, call
+lookup_metric_guidance for every metric you computed (for example "JS distance threshold",
+"Cohen's d threshold", "utility gap threshold", "identifiability threshold"), and take every
+threshold, reference level and interpretation from the returned guidance. Quote thresholds
+exactly as the guidance states them and name the source section when you use one. If the
+guidance gives no threshold for something, say so; never supply one of your own.
 
-Verdict rules (apply them mechanically):
-- categorical fidelity is "poor" if any categorical column is flagged, otherwise "good".
-- numerical fidelity is "poor" if any numerical column is flagged, otherwise "good".
-- utility is "poor" if the gap is above its threshold, otherwise "good".
-- privacy, only when it was assessed, is "poor" if either privacy threshold is crossed,
-  otherwise "good".
+Verdict rules (apply them mechanically, with the documented thresholds):
+- categorical fidelity is "poor" if any categorical column's JS distance is above the
+  documented threshold, otherwise "good".
+- numerical fidelity is "poor" if any numerical column's Cohen's d is above the documented
+  threshold, otherwise "good".
+- utility is "poor" if the utility gap (TRTR accuracy minus TSTR accuracy) is above the
+  documented threshold, otherwise "good"; a gap at or below zero is good.
+- privacy, only when it was assessed, is "poor" if the documented identifiability threshold
+  or the documented exact-match threshold is crossed, otherwise "good". epsilon_any is
+  supporting evidence only and is never thresholded.
 - overall is "poor" when utility is poor or privacy is poor; otherwise "excellent" when
   every assessed axis is good, and "acceptable" when at least one fidelity axis is poor.
 
@@ -102,10 +109,9 @@ Rules for the report:
 - You are a reporter, not a calculator. Quote numbers exactly as the tools returned them
   (rounding is fine). Never compute a new figure of your own: no means, counts, ratios,
   differences, percentages or factors that are not in a tool result.
-- Do not introduce any threshold other than the ones above.
-- Name a column as a problem only if its own tool result crosses its threshold. If utility
-  is poor but no column crosses a fidelity threshold, say that the cause is not visible in
-  the univariate fidelity metrics; do not guess which column is responsible.
+- Name a column as a problem only if its own tool result crosses the documented threshold.
+  If utility is poor but no column crosses a fidelity threshold, say that the cause is not
+  visible in the univariate fidelity metrics; do not guess which column is responsible.
 - The target column appears in the Cohen's d output because it is numeric. It is a label,
   not a feature: never flag it.
 - State the overall verdict plainly in the first lines. Name every flagged column with its
@@ -117,9 +123,9 @@ End the report with exactly one fenced JSON block of this form, and nothing afte
 Include the "privacy" key only when privacy was assessed:
 
 ```json
-{{"verdict": {{"categorical": "good|poor", "numerical": "good|poor", "utility": "good|poor",
-             "privacy": "good|poor", "overall": "excellent|acceptable|poor"}},
- "flagged_columns": ["column", "..."]}}
+{"verdict": {"categorical": "good|poor", "numerical": "good|poor", "utility": "good|poor",
+             "privacy": "good|poor", "overall": "excellent|acceptable|poor"},
+ "flagged_columns": ["column", "..."]}
 ```
 """
 
@@ -246,13 +252,49 @@ TOOLS: list[ToolParam] = [
             "required": ["real_csv_path", "synth_csv_path"],
         },
     },
+    {
+        "name": "lookup_metric_guidance",
+        "description": (
+            "Retrieve the metric documentation: one page per metric (JS distance, Cohen's d, "
+            "utility gap, identifiability) plus the verdict rules, each with Definition, Threshold, "
+            "Interpretation, Caveats and Citation sections. Returns the most relevant sections for "
+            "a free-text query, each with its metric, section name, text, source path and the "
+            "page's machine-readable threshold. Use it to obtain every threshold and reference "
+            "level you quote; one call per metric with a query such as 'Cohen's d threshold' is "
+            "the usual pattern."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What you need to know, e.g. 'utility gap threshold'."},
+                "metric": {
+                    "type": "string",
+                    "description": "Optional page filter: js_distance, cohens_d, utility_gap, identifiability or verdict_rules.",
+                },
+                "section": {
+                    "type": "string",
+                    "description": "Optional section filter: Definition, Threshold, Interpretation, Caveats or Citation.",
+                },
+                "top_k": {"type": "integer", "description": "How many sections to return (default 3)."},
+            },
+            "required": ["query"],
+        },
+    },
 ]
 
-TOOL_REGISTRY: dict[str, Callable[..., FidelityResult | UtilityResult | PrivacyResult]] = {
+def lookup_metric_guidance(
+    query: str, metric: str | None = None, section: str | None = None, top_k: int = 3
+) -> GuidanceResult:
+    """Tool wrapper around :func:`guidance.lookup`."""
+    return lookup(query, top_k=top_k, metric=metric, section=section)
+
+
+TOOL_REGISTRY: dict[str, Callable[..., FidelityResult | UtilityResult | PrivacyResult | GuidanceResult]] = {
     "js_divergence_categorical": js_divergence_categorical,
     "cohen_d_numerical": cohen_d_numerical,
     "tstr_xgboost": tstr_xgboost,
     "identifiability_heom": identifiability_heom,
+    "lookup_metric_guidance": lookup_metric_guidance,
 }
 
 

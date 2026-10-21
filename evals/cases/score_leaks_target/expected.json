@@ -6,7 +6,8 @@
   "tools": [
     "js_divergence_categorical",
     "cohen_d_numerical",
-    "tstr_xgboost"
+    "tstr_xgboost",
+    "lookup_metric_guidance"
   ],
   "verdict": {
     "categorical": "good",

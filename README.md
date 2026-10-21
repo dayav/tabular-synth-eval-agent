@@ -8,7 +8,7 @@ It is built on the evaluation methodology from my master's thesis on privacy-pre
 
 ## How it works
 
-You give the agent the path to a real dataset and the path to a synthetic version of it. The agent then calls three evaluation tools, plus a privacy tool when you ask for it, and synthesizes the results into a readable summary. It covers three dimensions of quality:
+You give the agent the path to a real dataset and the path to a synthetic version of it. The agent then calls three evaluation tools, plus a privacy tool when you ask for it, looks up the thresholds it needs in the metric documentation, and synthesizes the results into a readable summary. It covers three dimensions of quality:
 
 ### Univariate fidelity — does each column *look* like the real thing?
 
@@ -18,6 +18,10 @@ You give the agent the path to a real dataset and the path to a synthetic versio
 ### Privacy — does the synthetic data *expose* real records? (on request)
 
 - **HEOM nearest-neighbour identifiability.** Both datasets are encoded in HEOM space (numeric columns min-max scaled on the real data, a category mismatch counting 1). **Identifiability** is the fraction of real records whose nearest synthetic record is closer than their nearest other real record: about `0.5` for an honest sample of the same size, `1.0` for a copy. The tool also reports the thesis filter statistic **εANY** (fraction of synthetic rows inside some real record's 2-NN ball) and the fraction of **exact matches**. The agent calls this tool only when the request asks about privacy or disclosure risk; privacy is poor above `0.7` identifiability or `5%` exact matches, and a poor privacy verdict makes the overall verdict poor. The design, calibration figures and references are in [notes/privacy_tool.md](notes/privacy_tool.md); the code walkthrough is [notes/privacy_tool_code_walkthrough.md](notes/privacy_tool_code_walkthrough.md).
+
+### Thresholds come from the documentation, not from the prompt
+
+Every metric has a page under [docs/metrics/](docs/metrics/) with a definition, the threshold, interpretation, caveats and a citation. The agent has a `lookup_metric_guidance` tool that retrieves sections from those pages through a small local index (TF-IDF over word and character n-grams, cosine similarity; no neural embeddings, no network), and its prompt tells it to take every threshold and reference level from the retrieved guidance and name the source. The prompt itself carries no threshold. The eval harness reads the same pages' front matter for its answer keys, and a regression test fails if the docs, the agent and the checker ever disagree, or if a report quotes a threshold the agent never looked up. This is retrieval over metric documentation, not over customer data.
 
 ### Utility — is the synthetic data *useful* for a downstream model?
 
@@ -162,6 +166,7 @@ Read these as measured on six synthetic cases with thresholds given in the promp
 src/
   agent.py       # Agent loop: sends the prompt to Claude, dispatches tool calls, returns an AgentRun
   tools.py       # The four evaluation tools (JS distance, Cohen's d, TSTR/XGBoost, HEOM identifiability)
+  guidance.py    # Local index over docs/metrics; the lookup_metric_guidance tool and the thresholds
   report.py      # Writes the agent's assessment to a Markdown report
   api.py         # FastAPI service: POST /evaluate, GET /runs, GET /runs/{id}, GET /health
   runlog.py      # Per-run folder writer; pricing.py holds the dated list prices
@@ -171,6 +176,7 @@ regression/      # Deterministic pytest suite replaying recorded failures (make 
 tests/           # Known-answer unit tests for the tools
 examples/        # Sample real and synthetic CSVs
 notes/           # Scope, the eval-harness and run-logging notes, generated figures
+docs/metrics/    # One page per metric: definition, threshold, interpretation, caveats, citation
 docs/deploy.md   # Container and Azure Container Apps setup
 Dockerfile, requirements.lock, .github/workflows/ci.yml
 CHANGELOG.md
@@ -179,13 +185,13 @@ Makefile
 
 ## Roadmap
 
-v2, in order (phases 1 to 4 are done, bar the live Azure step):
+v2, in order (phases 1 to 5 are done, bar the live Azure step):
 
 1. ~~Agent eval harness and regression suite~~
 2. ~~Run logging: per-run folder with trace, latency, tokens, cost~~
 3. ~~FastAPI service, Dockerfile, CI with the regression suite as a gate~~; the Azure demo deployment is documented and wired, not yet live
 4. ~~Privacy tool (HEOM-based identifiability, from the thesis pipeline)~~
-5. Retrieval over metric documentation so thresholds come from the docs
+5. ~~Retrieval over metric documentation so thresholds come from the docs~~
 6. An LLM tabular-generation baseline evaluated by the same agent
 
 Out of scope: multivariate fidelity (correlation matrices, joint distributions), framework-based orchestration (e.g. LangGraph), a web UI.

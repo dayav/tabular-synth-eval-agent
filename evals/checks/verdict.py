@@ -13,16 +13,22 @@ import json
 import re
 from typing import Any
 
+import evals  # noqa: F401  (puts src/ on sys.path)
 from evals.checks.common import CheckResult
 
 VERDICT_START = re.compile(r"\{\s*\"verdict\"")
 FENCED_BLOCK = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
-JS_THRESHOLD = 0.1
-COHEN_D_THRESHOLD = 0.2
-UTILITY_GAP_THRESHOLD = 0.05
-IDENTIFIABILITY_THRESHOLD = 0.7
-EXACT_MATCH_THRESHOLD = 0.05
+# Thresholds are read from docs/metrics/*.md, the same pages the agent retrieves at run
+# time, so the answer key cannot disagree with the documentation.
+from guidance import thresholds as _doc_thresholds  # noqa: E402
+
+_T = _doc_thresholds()
+JS_THRESHOLD = float(_T["js_distance"]["threshold"])
+COHEN_D_THRESHOLD = float(_T["cohens_d"]["threshold"])
+UTILITY_GAP_THRESHOLD = float(_T["utility_gap"]["threshold"])
+IDENTIFIABILITY_THRESHOLD = float(_T["identifiability"]["threshold"])
+EXACT_MATCH_THRESHOLD = float(_T["identifiability"]["exact_match_threshold"])
 
 AXES = ("categorical", "numerical", "utility", "privacy", "overall")
 

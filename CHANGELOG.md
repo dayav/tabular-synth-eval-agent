@@ -1,5 +1,43 @@
 # Changelog
 
+## Phase 5 — retrieval over metric documentation (2026-10-21)
+
+### Added
+- `docs/metrics/`: one page per metric (`js_distance`, `cohens_d`, `utility_gap`,
+  `identifiability`) plus `verdict_rules`, each with YAML front matter holding the
+  machine-readable threshold and five fixed sections: Definition, Threshold,
+  Interpretation, Caveats, Citation (every page cites arXiv:2602.06390).
+- `src/guidance.py`: parses the pages, exposes `thresholds()`, and builds a small local
+  index over the sections (TF-IDF, word 1–2 grams plus character 3–5 grams, cosine) with
+  `lookup(query, top_k, metric, section)`. Lexical on purpose: five pages, exact technical
+  vocabulary, builds in milliseconds, runs offline.
+- Agent: fifth tool `lookup_metric_guidance`. The system prompt no longer contains any
+  threshold; it instructs the model to look up every threshold and reference level and
+  name the source section. `agent.py` and `evals/checks/verdict.py` both read their
+  threshold constants from the docs' front matter, so there is one source of truth.
+- `evals/checks/tool_sequence.py`: `lookup_metric_guidance` is a repeatable tool (at least
+  once, any number of times); all golden cases now expect it.
+- Regression: `test_thresholds_come_from_docs.py` pins that docs, agent and checker agree,
+  that the prompt carries no threshold number, that a report quoting a threshold without a
+  lookup result fails numeric faithfulness and passes with it, that at least one lookup is
+  required, and that each metric's threshold query lands on its Threshold section. The
+  oracle report now makes one lookup per metric; pre-phase-5 fixtures are replayed with the
+  guidance results appended (`replay_results`), since they were recorded when the prompt
+  carried the thresholds.
+- `tests/test_guidance.py`: page structure, thresholds, top hits for eight queries,
+  filters, and an index built from another folder.
+
+### Changed
+- The allowed set of the numeric-faithfulness checker now includes retrieved guidance,
+  which is the definition of a grounded threshold. Numbers in the docs are therefore
+  chosen with care (the JS page says "roughly 0.29", never a bare "0.3").
+
+### Measured (2026-10-21, all eight cases, one run each, Opus judge)
+- claude-haiku-5-5 and claude-sonnet-5-5: 8/8 on all three checks. Every run made one
+  lookup per metric (3 to 5 calls), quoted the documented thresholds, and produced the
+  expected verdict; no ungrounded number in 294 quoted figures. Clarity 4.38 and 4.83.
+
+
 ## Phase 4 — privacy tool (2026-10-21)
 
 ### Added

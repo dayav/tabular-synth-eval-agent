@@ -13,7 +13,7 @@ from pathlib import Path
 
 from evals.cases import Case, neutral_copy
 from evals.checks.numeric_faithfulness import check_numeric_faithfulness
-from regression.helpers import load_fixture, prompts_for
+from regression.helpers import load_fixture, prompts_for, replay_results
 
 
 def test_neutral_copy_prompt_contains_no_case_name(cases: list[Case], tmp_path: Path) -> None:
@@ -32,7 +32,7 @@ def test_neutral_copy_prompt_contains_no_case_name(cases: list[Case], tmp_path: 
 def test_replayed_path_leak_transcript_has_ungrounded_ten(cases: list[Case]) -> None:
     fx = load_fixture("age_x10_path_leak.json")
     case = next(c for c in cases if c.name == fx["case"])
-    results = [tc["result"] for tc in fx["tool_calls"]]
+    results = replay_results(fx)
     check = check_numeric_faithfulness(fx["report"], results, *prompts_for(case, fx["prompt"]))
     assert not check.passed
     assert "10" in check.details["ungrounded"], check.details

@@ -13,13 +13,13 @@ from __future__ import annotations
 from evals.cases import Case
 from evals.checks.numeric_faithfulness import check_numeric_faithfulness
 from evals.checks.verdict import check_verdict
-from regression.helpers import load_fixture, prompts_for
+from regression.helpers import load_fixture, prompts_for, replay_results
 
 
 def test_computed_ratio_is_the_only_ungrounded_number(cases: list[Case]) -> None:
     fx = load_fixture("age_x10_computed_ratio.json")
     case = next(c for c in cases if c.name == fx["case"])
-    results = [tc["result"] for tc in fx["tool_calls"]]
+    results = replay_results(fx)
     check = check_numeric_faithfulness(fx["report"], results, *prompts_for(case, fx["prompt"]))
     assert not check.passed
     assert check.details["ungrounded"] == ["24"], check.details

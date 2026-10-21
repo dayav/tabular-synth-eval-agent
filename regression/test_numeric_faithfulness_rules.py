@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from evals.cases import Case
 from evals.checks.numeric_faithfulness import check_numeric_faithfulness, clean_report
-from regression.helpers import load_fixture, prompts_for
+from regression.helpers import load_fixture, prompts_for, replay_results
 
 RESULTS = [{"per_column": {"gender": 0.17429, "city": 0.0441}, "mean": 0.1092, "n_columns": 2},
            {"tstr_accuracy": 0.787, "trtr_accuracy": 0.992, "utility_gap": -0.205, "n_test_samples": 400, "income": 42000}]
@@ -68,7 +68,7 @@ def test_fraction_is_reported() -> None:
 def test_replayed_recomputed_mean_is_ungrounded(cases: list[Case]) -> None:
     fx = load_fixture("clean_synthetic_recomputed_mean.json")
     case = next(c for c in cases if c.name == fx["case"])
-    results = [tc["result"] for tc in fx["tool_calls"]]
+    results = replay_results(fx)
     check = check_numeric_faithfulness(fx["report"], results, *prompts_for(case, fx["prompt"]))
     assert not check.passed
     assert len(check.details["ungrounded"]) == 1, check.details

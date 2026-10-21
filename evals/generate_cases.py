@@ -33,8 +33,8 @@ CASES_DIR = Path(__file__).resolve().parent / "cases"
 N_ROWS = 2000
 SEED = 42
 TARGET = "target"
-TOOLS = ["js_divergence_categorical", "cohen_d_numerical", "tstr_xgboost"]
-TOOLS_WITH_PRIVACY = [*TOOLS, "identifiability_heom"]
+TOOLS = ["js_divergence_categorical", "cohen_d_numerical", "tstr_xgboost", "lookup_metric_guidance"]
+TOOLS_WITH_PRIVACY = ["js_divergence_categorical", "cohen_d_numerical", "tstr_xgboost", "identifiability_heom", "lookup_metric_guidance"]
 
 
 def _z(x: np.ndarray) -> np.ndarray:

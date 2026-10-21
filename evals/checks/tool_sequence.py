@@ -12,6 +12,10 @@ from typing import Any
 
 from evals.checks.common import CheckResult
 
+# Tools that may legitimately be called more than once in a run (one lookup per metric);
+# they must still be called at least once when expected.
+REPEATABLE_TOOLS = frozenset({"lookup_metric_guidance"})
+
 
 def _same_file(a: Any, b: Path) -> bool:
     try:
@@ -35,13 +39,17 @@ def check_tool_sequence(
         n = counts.get(tool, 0)
         if n == 0:
             problems.append(f"{tool} was never called (its section of the report is unsupported)")
-        elif n > 1:
+        elif n > 1 and tool not in REPEATABLE_TOOLS:
             problems.append(f"{tool} was called {n} times")
     for tool, n in counts.items():
         if tool not in expected_tools:
             problems.append(f"unexpected tool {tool} called {n} time(s)")
 
     for tc in tool_calls:
+        if tc.name in REPEATABLE_TOOLS:
+            if getattr(tc, "is_error", False):
+                problems.append(f"{tc.name} returned an error: {tc.result}")
+            continue  # no file arguments to check
         if not _same_file(tc.input.get("real_csv_path"), real_path):
             problems.append(f"{tc.name}: real_csv_path={tc.input.get('real_csv_path')!r} is not the case's real file")
         if not _same_file(tc.input.get("synth_csv_path"), synth_path):

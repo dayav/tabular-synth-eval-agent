@@ -75,6 +75,8 @@ The three metrics are the ones used in the thesis pipeline this agent grew out o
 Thresholds come from the system prompt: JS distance flagged above 0.1, Cohen's d above 0.2, utility gap above 0.05. Bold cells are the ones the agent must flag. (The table is regenerated as `figures/tool_output_table.csv` by `make figures`.)
 
 > **Added in phase 4 (2026-10-21).** Two more cases reuse these files with the prompt asking about privacy: `identical_privacy` (the copy, which must now be poor overall because identifiability is 1.0 and every row is an exact match) and `clean_privacy` (the honest control, identifiability 0.49, which must stay excellent). The verdict gains a `privacy` axis only when asked for; `derive_expected` and `check_verdict` enforce that. The privacy tool and its calibration are described in the phase 4 changelog entry and in the README.
+>
+> **Added in phase 5 (2026-10-21).** The thresholds no longer live in the system prompt. They live in `docs/metrics/*.md`, the agent retrieves them with a `lookup_metric_guidance` tool, and the answer key reads the same pages, so section 5.2's "allowed set" now includes the retrieved guidance and a threshold quoted without a lookup is an invented number. Every golden case expects at least one lookup; `regression/test_thresholds_come_from_docs.py` pins the mechanism.
 
 ![Figure 2](figures/fig2_tool_output_heatmap.png)
 
