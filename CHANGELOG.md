@@ -1,5 +1,34 @@
 # Changelog
 
+## README and results table (2026-11-11)
+
+### Changed
+- `README.md` rewritten around what was measured: the eval results table first, then the
+  generator comparison, then what is in the repository, how the agent works and how it is
+  evaluated. The status line, the CI paragraph and the project tree now describe the
+  repository as it is; the roadmap of finished phases is replaced by a list of known gaps.
+- `evals/compare.py` tabulates every saved session with the agent version each one
+  measured, a totals row, the noise floor per sample size and a per-case table.
+  `--write` (`make results`) writes `results/agent_evals.md` and the README block between
+  the eval table markers. No model call.
+- `evals/run_eval.py` records the agent under test in `summary.json` (`agent`: git
+  revision, number of tools, hash of the system prompt), so new rows label themselves.
+  The seven existing sessions are labelled from this changelog.
+
+### Added
+- `results/README.md` (index of the two result tables), `results/agent_evals.md`,
+  `tests/test_compare_evals.py`.
+- `notes/agent_evals_explained.md` and `notes/agent_evals_gap_analysis.md`, with figures
+  from `notes/figures/make_agent_eval_figures.py`.
+
+### Corrected
+- The README table showed 3.96 for Sonnet 4.6 clarity while `summary.json` held 4.21 (the
+  re-scored value). The table is now generated from `summary.json`, and the two rows still
+  scored under the first judge prompt are marked.
+- The README said CI runs a live eval on `main`. The job is wired but has been skipped on
+  every run: the repository has no `ANTHROPIC_API_KEY` secret.
+
+
 ## Phase 6 — LLM generation baseline (2026-10-21)
 
 ### Added

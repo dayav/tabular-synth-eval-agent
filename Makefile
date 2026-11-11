@@ -1,4 +1,4 @@
-# Phase 1 targets. MODEL/RUNS/JUDGE override the eval defaults.
+# MODEL/RUNS/JUDGE override the eval defaults.
 MODEL ?= claude-sonnet-4-6
 RUNS  ?= 3
 JUDGE ?= claude-opus-5-5
@@ -6,7 +6,7 @@ PY    ?= python
 IMAGE ?= ghcr.io/dayav/tabular-synth-eval-agent:local
 PORT  ?= 8000
 
-.PHONY: fetch-generators compare-generators test regression unit eval eval-nojudge compare cases fixtures figures typecheck lint runs example api docker-build docker-run lock
+.PHONY: fetch-generators compare-generators test regression unit eval eval-nojudge compare results cases fixtures figures typecheck lint runs example api docker-build docker-run lock
 
 test: unit regression
 
@@ -24,6 +24,9 @@ eval-nojudge:
 
 compare:
 	$(PY) -m evals.compare
+
+results:  # rebuild results/agent_evals.md and the README eval table from the saved summaries; no API key needed
+	$(PY) -m evals.compare --write
 
 runs:
 	$(PY) runs/summarize.py
@@ -43,6 +46,7 @@ figures:
 	$(PY) notes/figures/make_service_figures.py
 	$(PY) notes/figures/make_privacy_figures.py
 	$(PY) notes/figures/make_generation_figures.py
+	$(PY) notes/figures/make_agent_eval_figures.py
 
 typecheck:
 	$(PY) -m mypy

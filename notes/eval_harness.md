@@ -2,6 +2,8 @@
 
 This note explains, from first principles, the eval harness and regression suite that ship with the synthetic-data evaluation agent in this repository: why each piece exists, what it measures, which published result each design choice rests on, and what the measured runs showed. It is written to be read on its own and to be reused when explaining the design to someone else.
 
+> **Scope of this note (added 2026-11-11).** The note was written with the first version of the agent (2026-10-18): six golden pairs, three tools, thresholds written in the prompt. Later changes are marked inline as "Added in phase 4" and "Added in phase 5". The measured runs in section 10 are the first session only; every session to date is tabulated in [../results/agent_evals.md](../results/agent_evals.md).
+
 Every figure is generated from the real golden cases and real tool output by [figures/make_figures.py](figures/make_figures.py):
 
 ```

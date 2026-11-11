@@ -11,10 +11,12 @@ Plumbing failures are excluded from the metrics but counted.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -44,6 +46,26 @@ TOOL_DESCRIPTIONS = "\n".join(
     + " ".join(str(p.get("description", "")) for p in t["input_schema"].get("properties", {}).values())
     for t in TOOLS
 )
+
+
+def agent_under_test() -> dict[str, Any]:
+    """What a session measured: the commit, the number of tools and a hash of the system prompt.
+
+    Saved in ``summary.json`` so a results table can say which agent each row belongs to.
+    """
+    repo = Path(__file__).resolve().parent.parent
+    try:
+        git = ["git", "-C", str(repo)]
+        revision = subprocess.run([*git, "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        changed = subprocess.run([*git, "status", "--porcelain", "--untracked-files=no"], capture_output=True, text=True, check=True).stdout.strip()
+        revision += "-dirty" if changed else ""
+    except (OSError, subprocess.CalledProcessError):
+        revision = "unknown"
+    return {
+        "git_revision": revision,
+        "n_tools": len(TOOLS),
+        "system_prompt_sha": hashlib.sha256(SYSTEM_PROMPT.encode("utf-8")).hexdigest()[:12],
+    }
 
 
 def classify_failure(run: AgentRun | None, exc: BaseException | None) -> str | None:
@@ -285,6 +307,8 @@ def rejudge(results_dir: Path, judge_model: str, workers: int) -> dict[str, Any]
     summary = summarise(records + failed, model=old["model_requested"], judge_model=judge_model, runs=old["runs_per_case"])
     summary["timestamp"] = old["timestamp"]
     summary["rejudged_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+    if "agent" in old:
+        summary["agent"] = old["agent"]  # the agent runs were not repeated
     (results_dir / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
     (results_dir / "summary.md").write_text(summary_markdown(summary), encoding="utf-8")
     return summary
@@ -340,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {name}: {marks}")
 
     summary = summarise(records, model=args.model, judge_model=judge_model, runs=args.runs)
+    summary["agent"] = agent_under_test()
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
     md = summary_markdown(summary)
     (out_dir / "summary.md").write_text(md, encoding="utf-8")

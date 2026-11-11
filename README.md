@@ -1,31 +1,126 @@
 # Synthetic Data Evaluation Agent
 
-An LLM agent that evaluates the quality of synthetic tabular data against a real reference dataset. Given two CSV files, the agent autonomously selects and runs fidelity and utility evaluations, then writes a plain-English assessment and saves it as a Markdown report.
+An LLM agent that evaluates synthetic tabular data against the real data it imitates, and an evaluation harness that grades the agent itself.
 
-It is built on the evaluation methodology from my master's thesis on privacy-preserving synthetic tabular data ([paper](https://arxiv.org/abs/2602.06390) · [thesis pipeline](https://github.com/dayav/pipeline_synthetic_tabular_data)) and is powered by Claude through the Anthropic SDK's native tool use.
+You give the agent a real CSV, a synthetic CSV and a target column. Claude, through the Anthropic SDK's native tool use, chooses among five typed Python tools, looks up every threshold in the metric documentation, and writes a report with a verdict on fidelity, utility and, on request, privacy. The harness then runs the agent on eight real/synthetic pairs whose right answer is known by construction, and checks its tool calls, its numbers and its verdict mechanically.
 
-> **Status:** MVP agent plus an evaluation harness and regression suite for the agent itself (v2 phase 1). Not deployed; no traffic beyond the author's own runs.
+The metrics and the method come from my master's thesis on privacy-preserving synthetic tabular data ([paper](https://arxiv.org/abs/2602.06390) · [thesis pipeline](https://github.com/dayav/pipeline_synthetic_tabular_data)).
 
-## How it works
+> **Status, 2026-11-11.** Built and on `main`: the agent, the eval harness, the regression suite, run logging, the HTTP service, the container image (published to GHCR by CI) and the generator comparison. Not done: the Azure demo deployment is documented and wired into CI but has never been run, so nothing is deployed and there is no traffic beyond my own runs.
 
-You give the agent the path to a real dataset and the path to a synthetic version of it. The agent then calls three evaluation tools, plus a privacy tool when you ask for it, looks up the thresholds it needs in the metric documentation, and synthesizes the results into a readable summary. It covers three dimensions of quality:
+## Results
 
-### Univariate fidelity — does each column *look* like the real thing?
+### The agent, graded
 
-- **Categorical columns — Jensen–Shannon distance.** Measures how closely each synthetic categorical column's distribution matches the real one. `0` means identical, larger values mean more divergence (typically `< 0.1` is good).
-- **Numerical columns — Cohen's *d*.** A standardized effect size for the difference in means between the real and synthetic values of each numerical column. Smaller is better (`< 0.2` is a small effect, indicating good fidelity).
+Each trial is one agent run on one golden case. It is checked mechanically on three points:
 
-### Privacy — does the synthetic data *expose* real records? (on request)
+- **Right tools.** The agent called the metric tools the case needs, once each, on the files it was given, and the privacy tool only when the request asked about privacy.
+- **Numbers traceable.** Every number in the report can be traced to a tool result (the retrieved guidance included), a tool description or the prompt. A figure the model computed itself fails the trial.
+- **Right verdict.** The verdict per axis, the overall verdict and the flagged columns match the answer key.
 
-- **HEOM nearest-neighbour identifiability.** Both datasets are encoded in HEOM space (numeric columns min-max scaled on the real data, a category mismatch counting 1). **Identifiability** is the fraction of real records whose nearest synthetic record is closer than their nearest other real record: about `0.5` for an honest sample of the same size, `1.0` for a copy. The tool also reports the thesis filter statistic **εANY** (fraction of synthetic rows inside some real record's 2-NN ball) and the fraction of **exact matches**. The agent calls this tool only when the request asks about privacy or disclosure risk; privacy is poor above `0.7` identifiability or `5%` exact matches, and a poor privacy verdict makes the overall verdict poor. The design, calibration figures and references are in [notes/privacy_tool.md](notes/privacy_tool.md); the code walkthrough is [notes/privacy_tool_code_walkthrough.md](notes/privacy_tool_code_walkthrough.md).
+A second model (`claude-opus-5-5`) scores clarity from 1 to 5 against a fixed rubric. It never decides a pass.
 
-### Thresholds come from the documentation, not from the prompt
+<!-- EVAL TABLE START -->
+7 sessions, 82 scored trials, last session 2026-10-21. A trial is one agent run on one golden case. 0 trials were lost to API errors, truncation or refusals.
 
-Every metric has a page under [docs/metrics/](docs/metrics/) with a definition, the threshold, interpretation, caveats and a citation. The agent has a `lookup_metric_guidance` tool that retrieves sections from those pages through a small local index (TF-IDF over word and character n-grams, cosine similarity; no neural embeddings, no network), and its prompt tells it to take every threshold and reference level from the retrieved guidance and name the source. The prompt itself carries no threshold. The eval harness reads the same pages' front matter for its answer keys, and a regression test fails if the docs, the agent and the checker ever disagree, or if a report quotes a threshold the agent never looked up. This is retrieval over metric documentation, not over customer data.
+| session (UTC) | agent under test | model | cases × runs | right tools | numbers traceable to a tool result | trials with no invented number | right verdict | all three checks | clarity (judge, 1–5) |
+|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-18 | 3 tools, thresholds in the prompt | claude-haiku-5-5 | 6 × 3 | 100% (18/18) | 100% (275/275) | 100% (18/18) | 100% (18/18) | 100% (18/18) | 4.64 † |
+| 2026-10-18 | 3 tools, thresholds in the prompt | claude-sonnet-4-6 | 6 × 3 | 100% (18/18) | 99.8% (404/405) | 94.4% (17/18) | 100% (18/18) | 94.4% (17/18) | 4.21 |
+| 2026-10-18 | 3 tools, thresholds in the prompt | claude-sonnet-5-5 | 6 × 3 | 100% (18/18) | 100% (299/299) | 100% (18/18) | 100% (18/18) | 100% (18/18) | 4.74 † |
+| 2026-10-21 | 4 tools (privacy added), thresholds in the prompt | claude-haiku-5-5 | 3 × 2 | 100% (6/6) | 100% (106/106) | 100% (6/6) | 100% (6/6) | 100% (6/6) | 4.50 |
+| 2026-10-21 | 4 tools (privacy added), thresholds in the prompt | claude-sonnet-5-5 | 3 × 2 | 100% (6/6) | 100% (123/123) | 100% (6/6) | 100% (6/6) | 100% (6/6) | 4.67 |
+| 2026-10-21 | 5 tools, thresholds retrieved from the docs | claude-haiku-5-5 | 8 × 1 | 100% (8/8) | 100% (151/151) | 100% (8/8) | 100% (8/8) | 100% (8/8) | 4.38 |
+| 2026-10-21 | 5 tools, thresholds retrieved from the docs | claude-sonnet-5-5 | 8 × 1 | 100% (8/8) | 100% (143/143) | 100% (8/8) | 100% (8/8) | 100% (8/8) | 4.83 |
+| **all sessions** | | | **82 trials** | 100% (82/82) | 99.9% (1501/1502) | 98.8% (81/82) | 100% (82/82) | 98.8% (81/82) | |
 
-### Utility — is the synthetic data *useful* for a downstream model?
+Trials by agent version: 3 tools, thresholds in the prompt: 54; 4 tools (privacy added), thresholds in the prompt: 12; 5 tools, thresholds retrieved from the docs: 16.
 
-- **Train on Synthetic, Test on Real (TSTR).** An XGBoost classifier is trained on the synthetic data and evaluated on held-out real data. Its accuracy is compared against a **Train on Real, Test on Real (TRTR)** baseline. The resulting **utility gap** (`TRTR − TSTR`) quantifies how much predictive value, if any, is lost by training on synthetic data instead of real data.
+Noise floor on a pass rate (1/√n): about ±24 points at 18 trials, about ±35 points at 8 trials, about ±41 points at 6 trials.
+
+† Scored under the first judge prompt, which did not show the judge the agent's instructions; not comparable with the undaggered rows.
+<!-- EVAL TABLE END -->
+
+How to read the table:
+
+- **One trial failed.** `claude-sonnet-4-6` on the `age_x10` case quoted a Cohen's d of 4.909 correctly, then added that it was "more than 24 times the flagging threshold", a ratio it computed itself. The verdict was right, so a check on the final answer alone would have passed it. That transcript is now a regression fixture.
+- **The table does not rank the models on correctness.** Every difference between rows is inside the noise floor. What it supports is narrower: the harness measures tool selection, numeric faithfulness and verdict correctness across model versions and agent versions, and it catches a subtle failure.
+- **Most trials measured an earlier agent.** The session with three runs per case (2026-10-18) ran the first agent: three tools, thresholds written in the prompt, six cases. The agent as it is today, with five tools, thresholds retrieved from the documentation and eight cases, has been run once per case on two models.
+- **Apart from that one trial, every model passes every case every time.** The suite therefore works as a regression check on the agent. It is not hard enough to separate one model from another.
+- **Clarity supports a ranking at most.** The judge has not been calibrated against human ratings.
+
+Results per golden case and the source folders are in [results/agent_evals.md](results/agent_evals.md). What this evaluation still lacks, with the evidence for each gap, is in [notes/agent_evals_gap_analysis.md](notes/agent_evals_gap_analysis.md).
+
+### Three generators, one evaluator
+
+The same four metric tools and the same agent scored three generators on three public datasets: CTGAN and TVAE outputs from the thesis pipeline, and an LLM baseline that saw only the column schema and marginal statistics. How the baseline works is [further down](#llm-generation-baseline).
+
+<!-- GENERATOR TABLE START -->
+Measured 2026-10-21: 3 datasets, 500 rows per generator, same real reference sample and the same held-out test rows for every generator. CTGAN and TVAE outputs are the thesis pipeline baselines (trained on the full training sets); the LLM (claude-sonnet-5-5) saw only the schema and marginal statistics of the reference sample. Agent verdicts by claude-sonnet-5-5.
+
+| dataset | generator | JS mean / max (flagged) | Cohen's d mean / max (flagged) | TSTR / TRTR | utility gap | identifiability | exact matches | agent overall |
+|---|---|---|---|---|---|---|---|---|
+| adult | CTGAN | 0.124 / 0.265 (6/9) | 0.086 / 0.197 (0/6) | 0.825 / 0.835 | +0.010 | 0.36 | 0.0% | acceptable |
+| adult | TVAE | 0.093 / 0.175 (5/9) | 0.077 / 0.166 (0/6) | 0.799 / 0.835 | +0.035 | 0.39 | 0.0% | acceptable |
+| adult | LLM | 0.103 / 0.237 (4/9) | 0.026 / 0.077 (0/6) | 0.816 / 0.835 | +0.019 | 0.39 | 0.0% | acceptable |
+| cardio | CTGAN | - / - (0/0) | 0.094 / 0.343 (2/11) | 0.647 / 0.684 | +0.037 | 0.51 | 0.0% | acceptable |
+| cardio | TVAE | - / - (0/0) | 0.056 / 0.122 (0/11) | 0.664 / 0.684 | +0.020 | 0.47 | 0.0% | excellent |
+| cardio | LLM | - / - (0/0) | 0.113 / 0.212 (1/11) | 0.705 / 0.684 | -0.020 | 0.35 | 0.0% | acceptable |
+| credit | CTGAN | - / - (0/0) | 0.210 / 0.533 (9/23) | 0.791 / 0.798 | +0.007 | 0.36 | 0.0% | acceptable |
+| credit | TVAE | - / - (0/0) | 0.077 / 0.186 (0/23) | 0.801 / 0.798 | -0.003 | 0.43 | 0.0% | excellent |
+| credit | LLM | - / - (0/0) | 0.128 / 0.259 (6/23) | 0.788 / 0.798 | +0.010 | 0.38 | 0.0% | acceptable |
+
+Read with care: three public datasets, a few hundred rows per generator, one draw each; this is a baseline, not a claim about LLMs and tabular data. Thresholds: JS above 0.1 and Cohen's d above 0.2 per column are flagged; utility gap above 0.05 is poor; identifiability above 0.7 or exact matches above 5% is poor. The LLM cannot copy rows it never saw, so its identifiability is a measure of how closely marginals alone place points near real records.
+<!-- GENERATOR TABLE END -->
+
+## What is in the repository
+
+| piece | where | check it yourself |
+|---|---|---|
+| Agent loop and five tools | [src/agent.py](src/agent.py), [src/tools.py](src/tools.py), [src/guidance.py](src/guidance.py) | `python src/agent.py` (needs an API key) |
+| Metric pages the agent retrieves its thresholds from | [docs/metrics/](docs/metrics/) | |
+| Eval harness: eight golden cases, three checks, an LLM judge | [evals/](evals/) | `make eval` (needs an API key) |
+| Regression suite: 55 tests, no model call, a few seconds | [regression/](regression/) | `make regression` |
+| Unit tests: 58, on the tools, the API, the run log, retrieval and generation | [tests/](tests/) | `make unit` |
+| Run logging: trace, latency, tokens, estimated cost per run | [src/runlog.py](src/runlog.py), [runs/](runs/) | `make runs` |
+| HTTP service | [src/api.py](src/api.py) | `make api` |
+| Container image and CI | [Dockerfile](Dockerfile), [.github/workflows/ci.yml](.github/workflows/ci.yml) | `docker pull ghcr.io/dayav/tabular-synth-eval-agent:latest` |
+| LLM generation baseline and the generator comparison | [src/generate.py](src/generate.py), [scripts/](scripts/) | `make compare-generators` (needs an API key) |
+| Result tables | [results/](results/) | `make results` |
+| Design notes with figures and references | [notes/](notes/) | |
+
+Test counts are as of 2026-11-11.
+
+## How the agent works
+
+The agent has five tools. Three always run, one runs on request, and one supplies the thresholds.
+
+| tool | what it returns | when the agent calls it |
+|---|---|---|
+| `js_divergence_categorical` | Jensen-Shannon distance between the real and synthetic distribution of each categorical column. `0` is identical, `1` is maximally different. | every evaluation |
+| `cohen_d_numerical` | Cohen's *d* for each numerical column: the difference in means in units of standard deviation. | every evaluation |
+| `tstr_xgboost` | Accuracy of an XGBoost classifier trained on synthetic data and tested on held-out real data (TSTR), the same trained on real data (TRTR), and the utility gap `TRTR − TSTR`. | every evaluation |
+| `identifiability_heom` | Nearest-neighbour identifiability in HEOM space: the fraction of real records whose nearest synthetic record is closer than their nearest other real record (about `0.5` for an honest sample of the same size, `1.0` for a copy). Also the thesis filter statistic εANY and the fraction of exact matches. | only when the request asks about privacy or disclosure risk |
+| `lookup_metric_guidance` | Sections of the metric pages, found through a small local index (TF-IDF over word and character n-grams, cosine similarity, no neural embeddings, no network). | for every metric it computed, before writing the report |
+
+**Thresholds come from the documentation, not from the prompt.** Every metric has a page under [docs/metrics/](docs/metrics/) with a definition, the threshold, interpretation, caveats and a citation. The agent's prompt carries no threshold: it tells the agent to take every threshold and reference level from the retrieved guidance and to name the source. The eval harness reads its answer keys from the same pages, and a regression test fails if the pages, the agent and the checker disagree, or if a report quotes a threshold the agent never looked up. This is retrieval over metric documentation, not over customer data.
+
+**The verdict is mechanical on purpose, so that it can be checked.** Each axis (categorical fidelity, numerical fidelity, utility and, when assessed, privacy) is good or poor against its documented threshold. Overall is poor when utility or privacy is poor, excellent when every assessed axis is good, and acceptable otherwise. The rules are in [docs/metrics/verdict_rules.md](docs/metrics/verdict_rules.md). The privacy tool's design and calibration are in [notes/privacy_tool.md](notes/privacy_tool.md).
+
+## How the agent is evaluated
+
+Eight real/synthetic pairs are built so that the right answer is known by construction: an exact copy, a clean re-draw, a shuffled column, a leaked label, a column scaled ×10, a missing category level, and the copy and the re-draw again with the prompt asking about privacy. `make eval` runs the agent on each pair N times, applies the three checks described under [Results](#the-agent-graded), and asks the judge for a clarity score.
+
+`make regression` is separate and needs no API key. Its 55 tests replay recorded failures and known edge cases through the same checkers in a few seconds, so a failure that was fixed once stays fixed. Three agent transcripts are replayed: one was recorded live, and two were rebuilt from the recorded failure text after the original transcripts were lost. Each fixture states its provenance.
+
+```bash
+make test                                   # unit tests and the regression suite, no API key needed
+make eval MODEL=claude-sonnet-5-5 RUNS=3    # live eval, judge defaults to claude-opus-5-5
+make eval-nojudge MODEL=claude-haiku-5-5    # mechanical checks only
+make results                                # rebuild results/agent_evals.md and the table above from the saved summaries
+```
+
+The design is explained from first principles, with figures and references, in [notes/eval_harness.md](notes/eval_harness.md). [notes/agent_evals_explained.md](notes/agent_evals_explained.md) walks through the same harness against Anthropic's article on agent evals.
 
 ## Installation
 
@@ -110,33 +205,6 @@ make runs                 # one row per run: model, latency, tokens, estimated c
 
 The design, with figures and references, is in [notes/run_logging.md](notes/run_logging.md); the code walkthrough is [notes/run_logging_code_walkthrough.md](notes/run_logging_code_walkthrough.md). Pass `log_dir=None` to `run_agent` to skip logging. Cost is an estimate from list prices in `src/pricing.py`, dated in every `usage.json`; a model missing from the table is reported as unpriced rather than guessed. One real run is committed under [runs/example/](runs/example/).
 
-## LLM generation baseline
-
-A `generate_with_llm` tool ([src/generate.py](src/generate.py)) asks Claude for rows as strict JSON from a dataset's column schema and marginal statistics only, validates every row and writes a CSV. It is a baseline next to the thesis pipeline's CTGAN and TVAE outputs, scored by the same four tools and judged by the same agent; it is deliberately not one of the evaluation agent's tools, because an evaluator must not generate what it grades. The design, the measured comparison with figures, and references are in [notes/llm_generation_baseline.md](notes/llm_generation_baseline.md); the code walkthrough is [notes/llm_generation_baseline_code_walkthrough.md](notes/llm_generation_baseline_code_walkthrough.md).
-
-```bash
-python scripts/fetch_generator_outputs.py        # thesis datasets + CTGAN/TVAE outputs into data/generators/ (git-ignored)
-python scripts/compare_generators.py             # same metrics, same agent, table below and results/generators/
-```
-
-<!-- GENERATOR TABLE START -->
-Measured 2026-10-21: 3 datasets, 500 rows per generator, same real reference sample and the same held-out test rows for every generator. CTGAN and TVAE outputs are the thesis pipeline baselines (trained on the full training sets); the LLM (claude-sonnet-5-5) saw only the schema and marginal statistics of the reference sample. Agent verdicts by claude-sonnet-5-5.
-
-| dataset | generator | JS mean / max (flagged) | Cohen's d mean / max (flagged) | TSTR / TRTR | utility gap | identifiability | exact matches | agent overall |
-|---|---|---|---|---|---|---|---|---|
-| adult | CTGAN | 0.124 / 0.265 (6/9) | 0.086 / 0.197 (0/6) | 0.825 / 0.835 | +0.010 | 0.36 | 0.0% | acceptable |
-| adult | TVAE | 0.093 / 0.175 (5/9) | 0.077 / 0.166 (0/6) | 0.799 / 0.835 | +0.035 | 0.39 | 0.0% | acceptable |
-| adult | LLM | 0.103 / 0.237 (4/9) | 0.026 / 0.077 (0/6) | 0.816 / 0.835 | +0.019 | 0.39 | 0.0% | acceptable |
-| cardio | CTGAN | - / - (0/0) | 0.094 / 0.343 (2/11) | 0.647 / 0.684 | +0.037 | 0.51 | 0.0% | acceptable |
-| cardio | TVAE | - / - (0/0) | 0.056 / 0.122 (0/11) | 0.664 / 0.684 | +0.020 | 0.47 | 0.0% | excellent |
-| cardio | LLM | - / - (0/0) | 0.113 / 0.212 (1/11) | 0.705 / 0.684 | -0.020 | 0.35 | 0.0% | acceptable |
-| credit | CTGAN | - / - (0/0) | 0.210 / 0.533 (9/23) | 0.791 / 0.798 | +0.007 | 0.36 | 0.0% | acceptable |
-| credit | TVAE | - / - (0/0) | 0.077 / 0.186 (0/23) | 0.801 / 0.798 | -0.003 | 0.43 | 0.0% | excellent |
-| credit | LLM | - / - (0/0) | 0.128 / 0.259 (6/23) | 0.788 / 0.798 | +0.010 | 0.38 | 0.0% | acceptable |
-
-Read with care: three public datasets, a few hundred rows per generator, one draw each; this is a baseline, not a claim about LLMs and tabular data. Thresholds: JS above 0.1 and Cohen's d above 0.2 per column are flagged; utility gap above 0.05 is poor; identifiability above 0.7 or exact matches above 5% is poor. The LLM cannot copy rows it never saw, so its identifiability is a measure of how closely marginals alone place points near real records.
-<!-- GENERATOR TABLE END -->
-
 ## HTTP service and container
 
 The agent is also served as a small FastAPI app ([src/api.py](src/api.py)):
@@ -158,73 +226,58 @@ curl -s -F real=@examples/real_sample.csv -F synthetic=@examples/synth_sample.cs
 make docker-build && make docker-run                    # same service in the container, runs/ mounted
 ```
 
-The multi-stage [Dockerfile](Dockerfile) installs the pinned [requirements.lock](requirements.lock) in a builder stage and ships a slim, non-root runtime with a health check. [CI](.github/workflows/ci.yml) runs lint, types, unit tests, the regression suite and the API tests on every PR; on `main` it also runs a cheap live eval (Haiku, one run per case), builds and publishes the image to GHCR, and, if the Azure variables are set, rolls the public demo deployment. The exact Azure setup is in [docs/deploy.md](docs/deploy.md); the design, with figures and references, is in [notes/service_and_deployment.md](notes/service_and_deployment.md) and the code walkthrough in [notes/service_and_deployment_code_walkthrough.md](notes/service_and_deployment_code_walkthrough.md).
+The multi-stage [Dockerfile](Dockerfile) installs the pinned [requirements.lock](requirements.lock) in a builder stage and ships a slim, non-root runtime with a health check.
 
-**Deployment status:** the image builds and serves locally; the Azure Container Apps demo is documented and wired into CI but **not yet live**. When it is, the URL goes here and nowhere else, labelled "public demo deployment".
+[CI](.github/workflows/ci.yml) runs lint, type checks (mypy strict on `src`), the unit tests and the regression suite on every pull request and every push. On `main` it also builds the image, publishes it to GHCR and smoke-tests it. Two more jobs are wired and do not run today: a live eval (Haiku, one run per case), skipped because the repository has no `ANTHROPIC_API_KEY` secret, and the Azure roll-out, off until `AZURE_DEPLOY` is set.
 
-## Evaluating the agent
+**Deployment status:** the image builds, is published and serves locally. The Azure Container Apps demo is documented in [docs/deploy.md](docs/deploy.md) and has never been run. When it is live, the URL goes here and nowhere else, labelled "public demo deployment". The design is in [notes/service_and_deployment.md](notes/service_and_deployment.md).
 
-An agent that grades data but is never itself graded is not much of a tool, so the repository ships an evaluation harness for the agent and a regression suite that runs on every commit. The design is explained from first principles, with figures and references, in [notes/eval_harness.md](notes/eval_harness.md).
+## LLM generation baseline
 
-In short: eight real/synthetic pairs are built so that the right answer is known by construction (an exact copy, a clean re-draw, a shuffled column, a leaked label, a column scaled ×10, a missing category level, and the copy and the re-draw again with the prompt asking about privacy). `make eval` runs the agent on each of them N times and checks three things mechanically: did it call the right tools, is every number in its report traceable to a tool result or the prompt, and is its verdict right. A second model scores clarity against a fixed rubric. `make regression` replays recorded failures through the checkers in a few seconds, without calling the model.
+A `generate_with_llm` function ([src/generate.py](src/generate.py)) asks Claude for rows as strict JSON from a dataset's column schema and marginal statistics only, validates every row and writes a CSV. No real row is sent to the model. It is a baseline next to the thesis pipeline's CTGAN and TVAE outputs, scored by the same four tools and judged by the same agent. It is deliberately not one of the evaluation agent's tools, because an evaluator must not generate what it grades. The measured table is under [Results](#three-generators-one-evaluator); the design and figures are in [notes/llm_generation_baseline.md](notes/llm_generation_baseline.md).
 
 ```bash
-make test                                   # unit tests for the tools + regression suite, no API key needed
-make eval MODEL=claude-sonnet-5-5 RUNS=3    # live eval, judge defaults to claude-opus-5-5
-make eval-nojudge MODEL=claude-haiku-5-5    # mechanical checks only
-make compare                                # one row per saved results folder
+python scripts/fetch_generator_outputs.py        # thesis datasets + CTGAN/TVAE outputs into data/generators/ (git-ignored)
+python scripts/compare_generators.py             # same metrics, same agent; rewrites the table and results/generators/
 ```
 
-Measured on 2026-10-18, six cases × three runs per model, judge `claude-opus-5-5`, no run lost to API errors or truncation:
+## Known gaps
 
-| model | tool-selection | numeric faithfulness | runs with no invented number | verdict | clarity (1–5, judge) |
-|---|---|---|---|---|---|
-| claude-sonnet-4-6 | 100% (18/18) | 99.8% (404/405) | 94% (17/18) | 100% (18/18) | 3.96 |
-| claude-sonnet-5-5 | 100% (18/18) | 100% (299/299) | 100% (18/18) | 100% (18/18) | 4.74 |
-| claude-haiku-5-5 | 100% (18/18) | 100% (275/275) | 100% (18/18) | 100% (18/18) | 4.64 |
+- **The current agent has few trials.** One run per case on two models. The three-run session predates the privacy tool and the retrieved thresholds.
+- **The default model has not been run on the current agent.** `claude-sonnet-4-6` is the default of the agent, the service and the Makefile, and its only session is the first one.
+- **The suite is saturated.** Every model passes nearly every trial, so there is no capability eval yet.
+- **The judge is uncalibrated**, and two saved clarity scores come from an older judge prompt (marked † in the table).
+- **The golden cases come from one constructed process.** On real generator outputs the agent agreed with the mechanical flags nine times out of nine, but that is one run per output, outside the suite.
+- **Nothing is deployed**, so there is no production monitoring and no user feedback.
 
-The one failure: Sonnet 4.6 wrote that a Cohen's d of 4.909 was "more than 24 times the flagging threshold", a ratio it computed itself; that transcript is now a regression fixture. At eighteen runs the noise floor on a pass rate is about ±24 points, so the faithfulness difference is one observation, not a result; the clarity gap is the only difference that clears the floor.
+The full list, 31 gaps with evidence and a fix order, is [notes/agent_evals_gap_analysis.md](notes/agent_evals_gap_analysis.md).
 
-Read these as measured on six synthetic cases with thresholds given in the prompt; they support "the harness measures tool selection, numeric faithfulness and verdict correctness across model versions and catches subtle failures", not fine-grained quality claims. The judge is uncalibrated against human ratings. Details, the failures found, and the noise floor are in the note.
+Out of scope: multivariate fidelity (correlation matrices, joint distributions), framework-based orchestration (for example LangGraph), a web UI.
 
 ## Project structure
 
 ```
 src/
   agent.py       # Agent loop: sends the prompt to Claude, dispatches tool calls, returns an AgentRun
-  tools.py       # The four evaluation tools (JS distance, Cohen's d, TSTR/XGBoost, HEOM identifiability)
+  tools.py       # The four metric tools (JS distance, Cohen's d, TSTR/XGBoost, HEOM identifiability)
   guidance.py    # Local index over docs/metrics; the lookup_metric_guidance tool and the thresholds
   generate.py    # generate_with_llm: schema + marginals -> strict JSON rows -> CSV (baseline, not an agent tool)
-scripts/         # fetch_generator_outputs.py, compare_generators.py
-results/         # generators/: the comparison table, its JSON and the LLM-generated samples
   report.py      # Writes the agent's assessment to a Markdown report
   api.py         # FastAPI service: POST /evaluate, GET /runs, GET /runs/{id}, GET /health
-  runlog.py      # Per-run folder writer; pricing.py holds the dated list prices
-evals/           # Golden cases, checkers, LLM judge, eval runner (make eval)
-runs/            # Per-run logs: trace, latency, tokens, cost (make runs); one example committed
-regression/      # Deterministic pytest suite replaying recorded failures (make regression)
-tests/           # Known-answer unit tests for the tools
-examples/        # Sample real and synthetic CSVs
-notes/           # Scope, the eval-harness and run-logging notes, generated figures
+  runlog.py      # Per-run folder writer
+  pricing.py     # Dated list prices behind the cost estimates
+evals/           # Golden cases, checkers, LLM judge, eval runner, saved session summaries
+regression/      # Deterministic pytest suite replaying recorded failures
+tests/           # Known-answer unit tests
+results/         # agent_evals.md (every eval session) and generators/ (the generator comparison)
+runs/            # Per-run logs; one example run committed
+scripts/         # fetch_generator_outputs.py, compare_generators.py
 docs/metrics/    # One page per metric: definition, threshold, interpretation, caveats, citation
 docs/deploy.md   # Container and Azure Container Apps setup
-Dockerfile, requirements.lock, .github/workflows/ci.yml
-CHANGELOG.md
-Makefile
+notes/           # Design notes and code walkthroughs, with generated figures
+examples/        # Sample real and synthetic CSVs
+Dockerfile, requirements.lock, .github/workflows/ci.yml, Makefile, CHANGELOG.md
 ```
-
-## Roadmap
-
-v2, in order (all six phases are done, bar the live Azure step):
-
-1. ~~Agent eval harness and regression suite~~
-2. ~~Run logging: per-run folder with trace, latency, tokens, cost~~
-3. ~~FastAPI service, Dockerfile, CI with the regression suite as a gate~~; the Azure demo deployment is documented and wired, not yet live
-4. ~~Privacy tool (HEOM-based identifiability, from the thesis pipeline)~~
-5. ~~Retrieval over metric documentation so thresholds come from the docs~~
-6. ~~An LLM tabular-generation baseline evaluated by the same agent~~
-
-Out of scope: multivariate fidelity (correlation matrices, joint distributions), framework-based orchestration (e.g. LangGraph), a web UI.
 
 ## License
 
