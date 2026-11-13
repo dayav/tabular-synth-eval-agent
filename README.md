@@ -21,7 +21,7 @@ Each trial is one agent run on one golden case. It is checked mechanically on th
 A second model (`claude-opus-5-5`) scores clarity from 1 to 5 against a fixed rubric. It never decides a pass.
 
 <!-- EVAL TABLE START -->
-7 sessions, 82 scored trials, last session 2026-10-21. A trial is one agent run on one golden case. 0 trials were lost to API errors, truncation or refusals.
+10 sessions, 154 scored trials, last session 2026-11-11. A trial is one agent run on one golden case. 0 trials were lost to API errors, truncation or refusals.
 
 | session (UTC) | agent under test | model | cases × runs | right tools | numbers traceable to a tool result | trials with no invented number | right verdict | all three checks | clarity (judge, 1–5) |
 |---|---|---|---|---|---|---|---|---|---|
@@ -32,11 +32,14 @@ A second model (`claude-opus-5-5`) scores clarity from 1 to 5 against a fixed ru
 | 2026-10-21 | 4 tools (privacy added), thresholds in the prompt | claude-sonnet-5-5 | 3 × 2 | 100% (6/6) | 100% (123/123) | 100% (6/6) | 100% (6/6) | 100% (6/6) | 4.67 |
 | 2026-10-21 | 5 tools, thresholds retrieved from the docs | claude-haiku-5-5 | 8 × 1 | 100% (8/8) | 100% (151/151) | 100% (8/8) | 100% (8/8) | 100% (8/8) | 4.38 |
 | 2026-10-21 | 5 tools, thresholds retrieved from the docs | claude-sonnet-5-5 | 8 × 1 | 100% (8/8) | 100% (143/143) | 100% (8/8) | 100% (8/8) | 100% (8/8) | 4.83 |
-| **all sessions** | | | **82 trials** | 100% (82/82) | 99.9% (1501/1502) | 98.8% (81/82) | 100% (82/82) | 98.8% (81/82) | |
+| 2026-11-11 | 5 tools at `c655a12` | claude-sonnet-4-6 | 8 × 3 | 100% (24/24) | 99.4% (838/843) | 83.3% (20/24) | 87.5% (21/24) | 70.8% (17/24) | 4.23 |
+| 2026-11-11 | 5 tools at `c655a12` | claude-sonnet-5-5 | 8 × 3 | 100% (24/24) | 100% (436/436) | 100% (24/24) | 100% (24/24) | 100% (24/24) | 4.79 |
+| 2026-11-11 | 5 tools at `c655a12` | claude-haiku-5-5 | 8 × 3 | 100% (24/24) | 99.5% (433/435) | 91.7% (22/24) | 100% (24/24) | 91.7% (22/24) | 4.39 |
+| **all sessions** | | | **154 trials** | 100% (154/154) | 99.8% (3208/3216) | 95.5% (147/154) | 98.1% (151/154) | 93.5% (144/154) | |
 
-Trials by agent version: 3 tools, thresholds in the prompt: 54; 4 tools (privacy added), thresholds in the prompt: 12; 5 tools, thresholds retrieved from the docs: 16.
+Trials by agent version: 3 tools, thresholds in the prompt: 54; 4 tools (privacy added), thresholds in the prompt: 12; 5 tools, thresholds retrieved from the docs: 16; 5 tools at `c655a12`: 72.
 
-Noise floor on a pass rate (1/√n): about ±24 points at 18 trials, about ±35 points at 8 trials, about ±41 points at 6 trials.
+Noise floor on a pass rate (1/√n): about ±20 points at 24 trials, about ±24 points at 18 trials, about ±35 points at 8 trials, about ±41 points at 6 trials.
 
 † Scored under the first judge prompt, which did not show the judge the agent's instructions; not comparable with the undaggered rows.
 <!-- EVAL TABLE END -->
