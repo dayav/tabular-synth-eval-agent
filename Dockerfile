@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Multi-stage build: dependencies compile in the builder, the runtime image ships only the venv and src/.
+# Multi-stage build: dependencies compile in the builder, the runtime image ships only the venv, src/ and docs/metrics/.
 
 FROM python:3.12-slim AS builder
 WORKDIR /build
@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm 
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY src/ ./src/
+# Runtime data, not just documentation: agent.py reads the thresholds from these pages at import.
+COPY docs/metrics/ ./docs/metrics/
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH="/app/src" \
     PYTHONUNBUFFERED=1 \

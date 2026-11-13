@@ -104,8 +104,17 @@ jobs:
       - name: smoke test the pushed image
         run: |
           docker run -d --name smoke -p 8000:8000 -e ANTHROPIC_API_KEY=unused ${{ env.IMAGE }}:${{ github.sha }}
-          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8000/health && break || sleep 2; done
-          docker logs smoke; docker rm -f smoke
+          ok=0
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8000/health; then ok=1; break; fi
+            sleep 2
+          done
+          docker logs smoke
+          docker rm -f smoke
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::the container never answered /health"
+            exit 1
+          fi
 
   # Public demo deployment on Azure Container Apps. Opt in with the repository variable AZURE_DEPLOY=true
   # and the OIDC secrets described in docs/deploy.md; without them this job is skipped.
@@ -133,5 +142,13 @@ jobs:
             --image "${{ needs.docker.outputs.image }}" \
             --set-env-vars ANTHROPIC_API_KEY=secretref:anthropic-api-key RUNS_DIR=/data/runs
           FQDN=$(az containerapp show --name "${{ vars.AZURE_CONTAINERAPP }}" --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" --query properties.configuration.ingress.fqdn -o tsv)
-          for i in $(seq 1 30); do curl -fsS "https://$FQDN/health" && break || sleep 5; done
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS "https://$FQDN/health"; then ok=1; break; fi
+            sleep 5
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::https://$FQDN/health never answered"
+            exit 1
+          fi
           echo "deployed https://$FQDN" | tee -a "$GITHUB_STEP_SUMMARY"
