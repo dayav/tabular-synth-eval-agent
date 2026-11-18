@@ -8,6 +8,10 @@ The metrics and the method come from my master's thesis on privacy-preserving sy
 
 > **Status, 2026-11-11.** Built and on `main`: the agent, the eval harness, the regression suite, run logging, the HTTP service, the container image (published to GHCR by CI) and the generator comparison. Not done: the Azure demo deployment is documented and wired into CI but has never been run, so nothing is deployed and there is no traffic beyond my own runs.
 
+![Overview diagram: the agent loop in the centre, called by the eval harness, the generator comparison and the HTTP service; the metric pages feed both the agent's thresholds and the eval answer keys](notes/figures/fig_ov1_overview.png)
+
+The three thick arrows are the three callers of the same `run_agent()`. The metric pages feed both the agent's thresholds and the eval answer keys, so the two cannot disagree. Each piece is listed with its files under [What is in the repository](#what-is-in-the-repository); the figure is drawn by [notes/figures/make_overview_figures.py](notes/figures/make_overview_figures.py).
+
 ## Results
 
 ### The agent, graded
@@ -122,6 +126,10 @@ make eval MODEL=claude-sonnet-5-5 RUNS=3    # live eval, judge defaults to claud
 make eval-nojudge MODEL=claude-haiku-5-5    # mechanical checks only
 make results                                # rebuild results/agent_evals.md and the table above from the saved summaries
 ```
+
+![Eval harness in five steps: build the golden cases, where the answer key's verdicts come from, run one trial, grade it with three checks and a judge, then count the results and feed failed trials back into the regression suite](notes/figures/fig_ov2_eval_harness.png)
+
+The figure follows one golden case from its construction to a row in the results table, in five steps. Each check card lists what the check compares the trial with, when it passes and what it cannot see. Blue is ordinary code with no model call, orange is a model call or model output, green is the threshold source and grey is data. It is drawn by the same script as the overview figure, [notes/figures/make_overview_figures.py](notes/figures/make_overview_figures.py).
 
 The design is explained from first principles, with figures and references, in [notes/eval_harness.md](notes/eval_harness.md). [notes/agent_evals_explained.md](notes/agent_evals_explained.md) walks through the same harness against Anthropic's article on agent evals.
 
